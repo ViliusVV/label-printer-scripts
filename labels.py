@@ -81,6 +81,12 @@ class LabelConfig:
     # Printer
     printer_port: str = "COM4"
 
+    # Manual-mode text matrix saved by preview_app.py.
+    # Shape: cells_per_label rows × len(lines) columns. Cells/lines beyond
+    # the matrix default to "" on load; current widget values overwrite it
+    # on every rerun.
+    manual: list[list[str]] = field(default_factory=list)
+
     @property
     def width_dots(self) -> int:
         return round(self.width_mm * self.dots_per_mm)
@@ -138,6 +144,10 @@ def _toml_value(v) -> str:
     if isinstance(v, str):
         escaped = v.replace("\\", "\\\\").replace('"', '\\"')
         return f'"{escaped}"'
+    if isinstance(v, list):
+        if not v:
+            return "[]"
+        return "[" + ", ".join(_toml_value(x) for x in v) + "]"
     raise TypeError(f"Cannot serialize {type(v).__name__} to TOML")
 
 
@@ -169,7 +179,19 @@ def _dump_toml(cfg: LabelConfig) -> str:
         "",
         "# Printer",
         f"printer_port = {_toml_value(cfg.printer_port)}",
+        "",
+        "# Manual text source: rows = cells (row-major), cols = lines.",
+        "# Must be written BEFORE [[lines]] — TOML attaches trailing keys to",
+        "# the most recent table.",
     ]
+    if cfg.manual:
+        out.append("manual = [")
+        for row in cfg.manual:
+            out.append(f"  {_toml_value(list(row))},")
+        out.append("]")
+    else:
+        out.append("manual = []")
+
     line_keys = [f.name for f in fields(LineConfig)]
     for lc in cfg.lines:
         out.append("")

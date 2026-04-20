@@ -309,14 +309,8 @@ cfg = LabelConfig(
     text_height_mm=text_height_mm,
     printer_port=printer_port,
     lines=lines,
+    manual=initial.manual,  # preserved in CSV mode; overwritten below in Manual mode
 )
-
-# Auto-save the config
-try:
-    cfg.to_toml(CONFIG_PATH)
-    st.sidebar.caption(f"Auto-saved to {CONFIG_PATH}")
-except OSError as e:
-    st.sidebar.error(f"Couldn't save {CONFIG_PATH.name}: {e}")
 
 
 # --- Text source --------------------------------------------------------------
@@ -328,6 +322,12 @@ cells_per_label = cfg.cells_per_label
 
 if source == "Manual":
     line_labels = [line_display_name(cfg.lines[j], j) for j in range(n_cols)]
+
+    def _saved_manual(i: int, j: int) -> str:
+        if i < len(initial.manual) and j < len(initial.manual[i]):
+            return str(initial.manual[i][j])
+        return ""
+
     cells: list[list[str]] = []
     for i in range(cells_per_label):
         x_idx = i % cfg.count_x
@@ -339,11 +339,13 @@ if source == "Manual":
             with cols_in[j]:
                 row.append(
                     st.text_input(
-                        line_labels[j], "",
+                        line_labels[j],
+                        value=_saved_manual(i, j),
                         key=f"{prefix}_manual_{i}_{j}",
                     )
                 )
         cells.append(row)
+    cfg.manual = cells  # persist the current matrix back into the config
     label_batches = [cells] if cells else []
 else:
     try:
@@ -383,6 +385,14 @@ else:
     if not label_batches:
         st.info("CSV has no rows — add some via the table above.")
         st.stop()
+
+# Auto-save. Done here (after the manual matrix is captured into cfg.manual)
+# so Manual-mode edits survive the rerun.
+try:
+    cfg.to_toml(CONFIG_PATH)
+    st.sidebar.caption(f"Auto-saved to {CONFIG_PATH}")
+except OSError as e:
+    st.sidebar.error(f"Couldn't save {CONFIG_PATH.name}: {e}")
 
 
 # --- Render + per-label actions ----------------------------------------------

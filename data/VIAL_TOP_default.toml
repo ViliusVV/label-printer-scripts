@@ -25,6 +25,14 @@ text_height_mm = 30.0
 # Printer
 printer_port = "COM4"
 
+# Manual text source: rows = cells (row-major), cols = lines.
+# Must be written BEFORE [[lines]] — TOML attaches trailing keys to
+# the most recent table.
+manual = [
+  ["aa", "hjh", "aqw"],
+  ["dd", "vvee", "bgfff"],
+]
+
 [[lines]]
 name = "TopLine"
 font_path = "C:/Windows/Fonts/verdanab.ttf"
