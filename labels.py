@@ -26,6 +26,7 @@ class LineConfig:
     bold: bool = False
     italic: bool = False
     underline: bool = False
+    underline_offset_px: int = 0  # extra gap between text bottom and underline
     default_text: str = ""  # rendered when the CSV cell is empty
 
 
@@ -230,7 +231,7 @@ def _draw_line(img, draw, xy, text: str, lc: LineConfig, font):
 
     if lc.underline:
         tw = text_w if text_w is not None else int(round(font.getlength("0" * 8)))
-        uy = y + lc.size_px
+        uy = y + lc.size_px + lc.underline_offset_px
         draw.line([(cx - tw / 2, uy), (cx + tw / 2, uy)], fill=0, width=1)
 
 

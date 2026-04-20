@@ -124,6 +124,12 @@ def _line_controls(label: str, defaults: LineConfig) -> LineConfig:
         underline = c3.checkbox(
             "Underline", value=defaults.underline, key=f"{label}_underline"
         )
+        underline_offset_px = st.slider(
+            "Underline offset (px)",
+            -10, 30,
+            value=int(defaults.underline_offset_px),
+            key=f"{label}_ul_offset",
+        )
         default_text = st.text_input(
             "Default when empty", value=defaults.default_text, key=f"{label}_default"
         )
@@ -133,6 +139,7 @@ def _line_controls(label: str, defaults: LineConfig) -> LineConfig:
         bold=bold,
         italic=italic,
         underline=underline,
+        underline_offset_px=int(underline_offset_px),
         default_text=default_text,
     )
 
