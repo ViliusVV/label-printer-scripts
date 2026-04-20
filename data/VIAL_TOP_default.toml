@@ -14,7 +14,7 @@ gap_mm = 0.0
 
 # Common
 outline_px = 1
-line_gap_px = 1
+line_gap_px = 3
 
 # VIAL_TOP specific
 circle_diameter_mm = 14.5
@@ -27,6 +27,7 @@ text_height_mm = 30.0
 printer_port = "COM4"
 
 [[lines]]
+name = "TopLine"
 font_path = "C:/Windows/Fonts/verdanab.ttf"
 size_px = 28
 bold = false
@@ -36,6 +37,7 @@ underline_offset_px = 0
 default_text = ""
 
 [[lines]]
+name = "MiddleLine"
 font_path = "C:/Windows/Fonts/verdanab.ttf"
 size_px = 56
 bold = false
@@ -45,6 +47,7 @@ underline_offset_px = 0
 default_text = ""
 
 [[lines]]
+name = "BottomLine"
 font_path = "C:/Windows/Fonts/verdanab.ttf"
 size_px = 28
 bold = false

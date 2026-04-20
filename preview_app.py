@@ -25,6 +25,7 @@ from labels import (
     SkeletonType,
     cells_from_csv,
     csv_path_for,
+    line_display_name,
     pack_cells_to_labels,
     render_label,
 )
@@ -218,7 +219,12 @@ with st.sidebar.expander("Lines", expanded=True):
 
 def _line_controls(idx: int, defaults: LineConfig) -> LineConfig:
     k = f"{prefix}_line{idx}"
-    with st.sidebar.expander(f"Line {idx + 1}", expanded=False):
+    with st.sidebar.expander(line_display_name(defaults, idx), expanded=False):
+        name = st.text_input(
+            "Name", value=defaults.name, key=f"{k}_name",
+            help="Shown as expander label, CSV column header, and manual-input label. "
+                 "Leave blank to fall back to 'Line N'.",
+        )
         font_path = _font_selectbox("Font", defaults.font_path, key=f"{k}_font")
         size_px = st.slider(
             "Size (px)", 6, 120, value=defaults.size_px, key=f"{k}_size"
@@ -237,6 +243,7 @@ def _line_controls(idx: int, defaults: LineConfig) -> LineConfig:
             "Default when empty", value=defaults.default_text, key=f"{k}_default"
         )
     return LineConfig(
+        name=name,
         font_path=font_path,
         size_px=int(size_px),
         bold=bold,
@@ -285,6 +292,7 @@ col_names = [f"line_{i + 1}" for i in range(n_cols)]
 cells_per_label = cfg.cells_per_label
 
 if source == "Manual":
+    line_labels = [line_display_name(cfg.lines[j], j) for j in range(n_cols)]
     cells: list[list[str]] = []
     for i in range(cells_per_label):
         x_idx = i % cfg.count_x
@@ -296,7 +304,7 @@ if source == "Manual":
             with cols_in[j]:
                 row.append(
                     st.text_input(
-                        f"Line {j + 1}", "",
+                        line_labels[j], "",
                         key=f"{prefix}_manual_{i}_{j}",
                     )
                 )
@@ -318,8 +326,10 @@ else:
         use_container_width=True,
         key=f"{prefix}_csv_editor_{n_cols}",
         column_config={
-            name: st.column_config.TextColumn(name.replace("_", " ").title())
-            for name in col_names
+            col_names[j]: st.column_config.TextColumn(
+                line_display_name(cfg.lines[j], j)
+            )
+            for j in range(n_cols)
         },
     )
 

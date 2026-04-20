@@ -47,7 +47,7 @@ Quirks that must be preserved when editing:
 `LabelConfig` (TOML-backed via `from_toml`/`to_toml`) owns the full skeleton spec. It has three parts:
 
 - **Common**: `type`, label paper (`width_mm`, `height_mm`, `dots_per_mm`), grid (`count_x`, `count_y`, `gap_mm`), `outline_px`, `line_gap_px`, `printer_port`.
-- **Lines**: `lines: list[LineConfig]` — N lines stacked vertically inside every cell. Each `LineConfig` carries `font_path`, `size_px`, `bold`, `italic`, `underline`, `underline_offset_px`, `default_text`.
+- **Lines**: `lines: list[LineConfig]` — N lines stacked vertically inside every cell. Each `LineConfig` carries `name` (UI/CSV-column label; falls back to `Line N` via `line_display_name`), `font_path`, `size_px`, `bold`, `italic`, `underline`, `underline_offset_px`, `default_text`.
 - **Type-specific**: currently only `circle_diameter_mm` (used by VIAL_TOP; preserved but ignored for other types).
 
 `SkeletonType` (enum) → `_CELL_RENDERERS` dispatch table (`str → callable`). Adding a new type = add an enum value, write `_render_<name>(img, draw, center, cell_dims, cell_lines, cfg)`, register it. Both existing renderers finish by calling `_render_lines` so the N-line stacking logic stays shared.

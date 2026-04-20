@@ -32,6 +32,7 @@ class SkeletonType(str, Enum):
 
 @dataclass
 class LineConfig:
+    name: str = ""  # human label shown in the UI + CSV header; falls back to "Line N"
     font_path: str = "C:/Windows/Fonts/verdanab.ttf"
     size_px: int = 28
     bold: bool = False
@@ -39,6 +40,11 @@ class LineConfig:
     underline: bool = False
     underline_offset_px: int = 0
     default_text: str = ""
+
+
+def line_display_name(lc: "LineConfig", index: int) -> str:
+    """UI-friendly label: `lc.name` if set, otherwise `Line {index+1}`."""
+    return lc.name.strip() if lc.name and lc.name.strip() else f"Line {index + 1}"
 
 
 @dataclass
