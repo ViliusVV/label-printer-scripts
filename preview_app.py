@@ -156,8 +156,9 @@ with st.sidebar.expander("Grid", expanded=True):
         "Count Y", 1, 10, value=int(initial.count_y), key=f"{prefix}_count_y"
     )
     gap_mm = st.number_input(
-        "Gap between cells (mm)", 0.0, 20.0,
-        value=float(initial.gap_mm), step=0.5, key=f"{prefix}_gap_mm",
+        "Gap between cells (mm, negative = overlap / shared outline)",
+        -10.0, 20.0,
+        value=float(initial.gap_mm), step=0.125, key=f"{prefix}_gap_mm",
     )
 
 with st.sidebar.expander("Common styling", expanded=False):
@@ -170,7 +171,9 @@ with st.sidebar.expander("Common styling", expanded=False):
         value=int(initial.line_gap_px), key=f"{prefix}_line_gap_px",
     )
 
-# Type-specific knobs
+# Type-specific knobs. Each renderer reads its own cell bounding box
+# (circle diameter for VIAL_TOP, width/height for TEXT); the grid is
+# built from that box, not from evenly dividing the label.
 if cfg_type == SkeletonType.VIAL_TOP.value:
     with st.sidebar.expander("VIAL_TOP", expanded=False):
         circle_diameter_mm = st.number_input(
@@ -178,8 +181,25 @@ if cfg_type == SkeletonType.VIAL_TOP.value:
             value=float(initial.circle_diameter_mm), step=0.5,
             key=f"{prefix}_circle_diameter_mm",
         )
+    text_width_mm = initial.text_width_mm
+    text_height_mm = initial.text_height_mm
+elif cfg_type == SkeletonType.TEXT.value:
+    circle_diameter_mm = initial.circle_diameter_mm
+    with st.sidebar.expander("TEXT", expanded=False):
+        text_width_mm = st.number_input(
+            "Text box width (mm)", 1.0, 100.0,
+            value=float(initial.text_width_mm), step=0.5,
+            key=f"{prefix}_text_width_mm",
+        )
+        text_height_mm = st.number_input(
+            "Text box height (mm)", 1.0, 100.0,
+            value=float(initial.text_height_mm), step=0.5,
+            key=f"{prefix}_text_height_mm",
+        )
 else:
-    circle_diameter_mm = initial.circle_diameter_mm  # preserved but unused
+    circle_diameter_mm = initial.circle_diameter_mm
+    text_width_mm = initial.text_width_mm
+    text_height_mm = initial.text_height_mm
 
 with st.sidebar.expander("Printer", expanded=False):
     printer_port = st.text_input(
@@ -243,6 +263,8 @@ cfg = LabelConfig(
     outline_px=int(outline_px),
     line_gap_px=int(line_gap_px),
     circle_diameter_mm=circle_diameter_mm,
+    text_width_mm=text_width_mm,
+    text_height_mm=text_height_mm,
     printer_port=printer_port,
     lines=lines,
 )

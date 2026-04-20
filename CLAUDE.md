@@ -64,7 +64,7 @@ data/X.csv (one row = one cell, columns map positionally onto cfg.lines)
 Key design rules:
 
 - **Short final batches are intentional.** `render_label` loops only over the cells provided; unused grid slots draw nothing (no outline, no text). This is how "don't render a circle if there aren't enough CSV entries" is satisfied — and it generalises to 2-D grids.
-- Grid geometry divides the full label evenly (`cell_w = (W − gap*(count_x−1)) / count_x`, same for `cell_h`). Cells are filled **row-major** (left-to-right, top-to-bottom). A half-empty last label keeps earlier cells at their full-label positions.
+- **Grid uses the type-specific cell bounding box, NOT an even slice of the label.** `_cell_box_dots(cfg)` returns `(circle_diameter, circle_diameter)` for VIAL_TOP and `(text_width, text_height)` for TEXT. The full `count_x × count_y` block is centred in the label. `gap_mm` (between cells) may be **negative** so that adjacent outlines overlap into a single shared line (e.g. `gap_mm = -0.125` on an 8 dpmm printer shares a 1-px edge between rectangles — use this to avoid doubled borders). Cells are filled **row-major** (left-to-right, top-to-bottom).
 - `_render_lines` stacks lines vertically and centres the stack on the cell's midpoint. For N=3 with sizes 28/56/28 this is equivalent to the older "middle line anchored at centre" behaviour, but it generalises to any N.
 - Bold → PIL `stroke_width=1`. Italic → render text to a temp `L` image, apply affine shear (0.2), paste through a mask. Both paths funnel through `_draw_line`; see `_render_text_image`.
 - Empty cells on a line with a non-empty `default_text` render the default (with its underline, if any) — this is the blank-writing-line placeholder for vial bottom rows.

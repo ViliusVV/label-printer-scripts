@@ -65,6 +65,10 @@ class LabelConfig:
     # VIAL_TOP-specific
     circle_diameter_mm: float = 14.5
 
+    # TEXT-specific
+    text_width_mm: float = 36.0
+    text_height_mm: float = 30.0
+
     # Printer
     printer_port: str = "COM4"
 
@@ -83,6 +87,14 @@ class LabelConfig:
     @property
     def circle_diameter_dots(self) -> int:
         return round(self.circle_diameter_mm * self.dots_per_mm)
+
+    @property
+    def text_width_dots(self) -> int:
+        return round(self.text_width_mm * self.dots_per_mm)
+
+    @property
+    def text_height_dots(self) -> int:
+        return round(self.text_height_mm * self.dots_per_mm)
 
     @property
     def cells_per_label(self) -> int:
@@ -143,6 +155,10 @@ def _dump_toml(cfg: LabelConfig) -> str:
         "# VIAL_TOP specific",
         f"circle_diameter_mm = {_toml_value(cfg.circle_diameter_mm)}",
         "",
+        "# TEXT specific",
+        f"text_width_mm = {_toml_value(cfg.text_width_mm)}",
+        f"text_height_mm = {_toml_value(cfg.text_height_mm)}",
+        "",
         "# Printer",
         f"printer_port = {_toml_value(cfg.printer_port)}",
     ]
@@ -184,7 +200,14 @@ Cell = list[str]
 
 def render_label(cells: list[Cell], cfg: LabelConfig) -> Image.Image:
     """Render one physical label. Only the cells passed are drawn; missing
-    grid slots are left blank (the skeleton outline is not drawn for them)."""
+    grid slots are left blank (the skeleton outline is not drawn for them).
+
+    Grid geometry uses the type-specific cell bounding box (see
+    `_cell_box_dots`), NOT an even division of the label. The whole
+    count_x × count_y block is centred in the label. `gap_mm` is applied
+    between cells and may be negative so that adjacent outlines can share
+    a single line (e.g. rectangle edges meeting with no doubling).
+    """
     max_cells = cfg.cells_per_label
     if len(cells) > max_cells:
         raise ValueError(f"{len(cells)} cells provided but grid fits {max_cells}")
@@ -197,27 +220,40 @@ def render_label(cells: list[Cell], cfg: LabelConfig) -> Image.Image:
     img = Image.new("1", (W, H), 1)
     draw = ImageDraw.Draw(img)
 
+    cell_w, cell_h = _cell_box_dots(cfg)
     gap = cfg.gap_dots
-    cell_w = (W - gap * (cfg.count_x - 1)) / cfg.count_x
-    cell_h = (H - gap * (cfg.count_y - 1)) / cfg.count_y
+    total_w = cell_w * cfg.count_x + gap * (cfg.count_x - 1)
+    total_h = cell_h * cfg.count_y + gap * (cfg.count_y - 1)
+    start_x = (W - total_w) / 2
+    start_y = (H - total_h) / 2
 
     for i, cell in enumerate(cells):
         x_idx = i % cfg.count_x
         y_idx = i // cfg.count_x
-        cx = cell_w / 2 + x_idx * (cell_w + gap)
-        cy = cell_h / 2 + y_idx * (cell_h + gap)
+        cx = start_x + cell_w / 2 + x_idx * (cell_w + gap)
+        cy = start_y + cell_h / 2 + y_idx * (cell_h + gap)
         renderer(img, draw, (cx, cy), (cell_w, cell_h), cell, cfg)
 
     return img
 
 
+def _cell_box_dots(cfg: LabelConfig) -> tuple[int, int]:
+    """Per-type cell bounding box in printer dots."""
+    if cfg.type == SkeletonType.VIAL_TOP.value:
+        d = cfg.circle_diameter_dots
+        return d, d
+    if cfg.type == SkeletonType.TEXT.value:
+        return cfg.text_width_dots, cfg.text_height_dots
+    raise ValueError(f"Unknown skeleton type: {cfg.type!r}")
+
+
 def _render_vial_top(img, draw, center, cell_dims, cell_lines, cfg: LabelConfig):
     cx, cy = center
-    d = cfg.circle_diameter_dots
-    r = d / 2
+    cell_w, _ = cell_dims  # cell box is square for VIAL_TOP (== circle diameter)
+    r = cell_w / 2
     if cfg.outline_px > 0:
         draw.ellipse(
-            (cx - r, cy - r, cx - r + d - 1, cy - r + d - 1),
+            (cx - r, cy - r, cx - r + cell_w - 1, cy - r + cell_w - 1),
             outline=0, width=cfg.outline_px,
         )
     _render_lines(img, draw, (cx, cy), cell_lines, cfg.lines, cfg.line_gap_px)
