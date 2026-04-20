@@ -3,4 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="uv (label-printer)" />
   </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="uv (label-printer)" project-jdk-type="Python SDK" />
 </project>
