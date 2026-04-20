@@ -167,10 +167,6 @@ with st.sidebar.expander("Common styling", expanded=False):
         "Outline thickness (px, 0 = none)", 0, 10,
         value=int(initial.outline_px), key=f"{prefix}_outline_px",
     )
-    line_gap_px = st.slider(
-        "Line gap (px)", 0, 20,
-        value=int(initial.line_gap_px), key=f"{prefix}_line_gap_px",
-    )
 
 # Type-specific knobs. Each renderer reads its own cell bounding box
 # (circle diameter for VIAL_TOP, width/height for TEXT); the grid is
@@ -239,6 +235,17 @@ def _line_controls(idx: int, defaults: LineConfig) -> LineConfig:
             "Underline offset (px)", -10, 30,
             value=int(defaults.underline_offset_px), key=f"{k}_ul_offset",
         )
+        ox, oy = st.columns(2)
+        offset_x_px = ox.number_input(
+            "X offset from cell centre (px)",
+            -400, 400,
+            value=int(defaults.offset_x_px), key=f"{k}_offset_x",
+        )
+        offset_y_px = oy.number_input(
+            "Y offset from cell centre (px)",
+            -400, 400,
+            value=int(defaults.offset_y_px), key=f"{k}_offset_y",
+        )
         default_text = st.text_input(
             "Default when empty", value=defaults.default_text, key=f"{k}_default"
         )
@@ -250,6 +257,8 @@ def _line_controls(idx: int, defaults: LineConfig) -> LineConfig:
         italic=italic,
         underline=underline,
         underline_offset_px=int(underline_offset_px),
+        offset_x_px=int(offset_x_px),
+        offset_y_px=int(offset_y_px),
         default_text=default_text,
     )
 
@@ -268,7 +277,6 @@ cfg = LabelConfig(
     count_y=int(count_y),
     gap_mm=gap_mm,
     outline_px=int(outline_px),
-    line_gap_px=int(line_gap_px),
     circle_diameter_mm=circle_diameter_mm,
     text_width_mm=text_width_mm,
     text_height_mm=text_height_mm,

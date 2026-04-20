@@ -39,6 +39,10 @@ class LineConfig:
     italic: bool = False
     underline: bool = False
     underline_offset_px: int = 0
+    # Position relative to the cell's centre. (0, 0) = dead centre;
+    # negative Y = above centre, positive = below.
+    offset_x_px: int = 0
+    offset_y_px: int = 0
     default_text: str = ""
 
 
@@ -63,7 +67,6 @@ class LabelConfig:
 
     # Common styling
     outline_px: int = 1
-    line_gap_px: int = 1
 
     # Lines stacked inside every cell
     lines: list[LineConfig] = field(default_factory=list)
@@ -156,7 +159,6 @@ def _dump_toml(cfg: LabelConfig) -> str:
         "",
         "# Common",
         f"outline_px = {_toml_value(cfg.outline_px)}",
-        f"line_gap_px = {_toml_value(cfg.line_gap_px)}",
         "",
         "# VIAL_TOP specific",
         f"circle_diameter_mm = {_toml_value(cfg.circle_diameter_mm)}",
@@ -262,7 +264,7 @@ def _render_vial_top(img, draw, center, cell_dims, cell_lines, cfg: LabelConfig)
             (cx - r, cy - r, cx - r + cell_w - 1, cy - r + cell_w - 1),
             outline=0, width=cfg.outline_px,
         )
-    _render_lines(img, draw, (cx, cy), cell_lines, cfg.lines, cfg.line_gap_px)
+    _render_lines(img, draw, (cx, cy), cell_lines, cfg.lines)
 
 
 def _render_text(img, draw, center, cell_dims, cell_lines, cfg: LabelConfig):
@@ -274,7 +276,7 @@ def _render_text(img, draw, center, cell_dims, cell_lines, cfg: LabelConfig):
              cx + cell_w / 2 - 1, cy + cell_h / 2 - 1),
             outline=0, width=cfg.outline_px,
         )
-    _render_lines(img, draw, (cx, cy), cell_lines, cfg.lines, cfg.line_gap_px)
+    _render_lines(img, draw, (cx, cy), cell_lines, cfg.lines)
 
 
 _CELL_RENDERERS: dict[str, Callable] = {
@@ -283,21 +285,34 @@ _CELL_RENDERERS: dict[str, Callable] = {
 }
 
 
-def _render_lines(img, draw, center, cell_lines, line_cfgs, line_gap_px):
+def _render_lines(img, draw, center, cell_lines, line_cfgs):
+    """Render each line at its own offset from the cell centre.
+
+    Unlike a classic stack-with-gap, lines are positioned independently via
+    `LineConfig.offset_x_px` / `offset_y_px`, so they can be placed anywhere
+    inside (or outside) the cell. A line's anchor point is its visual centre.
+    """
     if not line_cfgs:
         return
     cx, cy = center
-    total_h = sum(lc.size_px for lc in line_cfgs) + line_gap_px * (len(line_cfgs) - 1)
-    y = cy - total_h / 2
     for i, lc in enumerate(line_cfgs):
         text = cell_lines[i] if i < len(cell_lines) else ""
         font = _load_font(lc.font_path, lc.size_px)
-        _draw_line(img, draw, (cx, y), text, lc, font)
-        y += lc.size_px + line_gap_px
+        _draw_line(
+            img, draw,
+            (cx + lc.offset_x_px, cy + lc.offset_y_px),
+            text, lc, font,
+        )
 
 
 def _draw_line(img, draw, xy, text: str, lc: LineConfig, font):
-    cx, y = xy
+    """Draw a single line centred on `xy` (both horizontally and vertically).
+
+    Underline (if enabled) sits below the line's nominal half-height plus
+    `underline_offset_px`, so moving a line via offsets carries its underline
+    with it.
+    """
+    cx, cy = xy
     effective = text if text else lc.default_text
     if not effective:
         return
@@ -309,17 +324,17 @@ def _draw_line(img, draw, xy, text: str, lc: LineConfig, font):
         if lc.bold or lc.italic:
             temp = _render_text_image(effective, font, bold=lc.bold, italic=lc.italic)
             mask = temp.point(lambda p: 255 if p < 128 else 0, mode="L")
-            text_w = temp.size[0]
+            text_w, text_h = temp.size
             x0 = int(round(cx - text_w / 2))
-            y0 = int(round(y))
+            y0 = int(round(cy - text_h / 2))
             img.paste(0, (x0, y0), mask)
         else:
-            draw.text((cx, y), effective, fill=0, font=font, anchor="mt")
+            draw.text((cx, cy), effective, fill=0, font=font, anchor="mm")
             text_w = int(round(font.getlength(effective)))
 
     if lc.underline:
         tw = text_w if text_w is not None else int(round(font.getlength("0" * 8)))
-        uy = y + lc.size_px + lc.underline_offset_px
+        uy = cy + lc.size_px / 2 + lc.underline_offset_px
         draw.line([(cx - tw / 2, uy), (cx + tw / 2, uy)], fill=0, width=1)
 
 
