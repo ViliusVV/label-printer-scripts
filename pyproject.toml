@@ -7,3 +7,6 @@ dependencies = [
     "pillow>=12.2.0",
     "pyserial>=3.5",
 ]
+
+[project.optional-dependencies]
+preview = ["streamlit>=1.30"]

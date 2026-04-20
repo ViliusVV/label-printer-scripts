@@ -1,0 +1,7 @@
+top,middle,bottom
+R1,10k,1%
+R2,4k7,1%
+C1,100n,50V
+C2,10u,25V
+L1,10uH,
+D1,1N4148,
