@@ -10,9 +10,11 @@ Run:  uv run streamlit run preview_app.py
 """
 from __future__ import annotations
 
+import csv as csv_mod
 import io
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 from PIL import Image, ImageFont
 
@@ -24,9 +26,36 @@ from labels import (
     pack_circles_to_labels,
     render_label,
 )
+from printer import HAlign, LabelPrinter, VAlign
 
 CONFIG_PATH = Path("config.toml")
+CSV_PATH = Path("labels.csv")
 FONTS_DIR = Path("C:/Windows/Fonts")
+
+
+def _val(x) -> str:
+    return "" if pd.isna(x) else str(x)
+
+
+def _save_csv(path: Path, circles: list[CircleText]) -> None:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp, "w", newline="", encoding="utf-8") as f:
+        w = csv_mod.writer(f)
+        w.writerow(["top", "middle", "bottom"])
+        for c in circles:
+            w.writerow([c.top, c.middle, c.bottom])
+    tmp.replace(path)
+
+
+def _print_image(img: Image.Image, port: str, cfg: LabelConfig) -> None:
+    p = LabelPrinter(
+        port, label_width_mm=cfg.width_mm, label_height_mm=cfg.height_mm
+    )
+    try:
+        p.print_bitmap(img, halign=HAlign.LEFT, valign=VAlign.TOP)
+        p.next_label()
+    finally:
+        p.close()
 
 
 @st.cache_data(show_spinner="Scanning fonts…")
@@ -144,6 +173,9 @@ top_cfg = _line_controls("Top line", initial.top)
 middle_cfg = _line_controls("Middle line", initial.middle)
 bottom_cfg = _line_controls("Bottom line", initial.bottom)
 
+with st.sidebar.expander("Printer", expanded=False):
+    printer_port = st.text_input("Serial port", "COM4", key="printer_port")
+
 cfg = LabelConfig(
     width_mm=width_mm,
     height_mm=height_mm,
@@ -185,13 +217,40 @@ if source == "Manual":
     label_batches = [manual_circles]
 else:
     try:
-        all_circles = circles_from_csv("labels.csv")
+        loaded = circles_from_csv(CSV_PATH)
     except FileNotFoundError:
-        st.error("labels.csv not found in working directory.")
-        st.stop()
-    label_batches = pack_circles_to_labels(all_circles, cfg.circle_count)
+        loaded = []
+
+    df_in = pd.DataFrame(
+        [{"top": c.top, "middle": c.middle, "bottom": c.bottom} for c in loaded],
+        columns=["top", "middle", "bottom"],
+    )
+    df_edited = st.data_editor(
+        df_in,
+        num_rows="dynamic",
+        use_container_width=True,
+        key="csv_editor",
+        column_config={
+            "top": st.column_config.TextColumn("Top"),
+            "middle": st.column_config.TextColumn("Middle"),
+            "bottom": st.column_config.TextColumn("Bottom"),
+        },
+    )
+
+    csv_circles = [
+        CircleText(top=_val(r.top), middle=_val(r.middle), bottom=_val(r.bottom))
+        for r in df_edited.itertuples(index=False)
+        if any(_val(getattr(r, c)).strip() for c in ("top", "middle", "bottom"))
+    ]
+    try:
+        _save_csv(CSV_PATH, csv_circles)
+        st.caption(f"{len(csv_circles)} row(s) · auto-saved to {CSV_PATH.name}")
+    except OSError as e:
+        st.error(f"Couldn't save labels.csv: {e}")
+
+    label_batches = pack_circles_to_labels(csv_circles, cfg.circle_count)
     if not label_batches:
-        st.warning("labels.csv has no data rows.")
+        st.info("CSV has no rows — add some via the table above.")
         st.stop()
 
 scale = st.slider("Display scale", 1, 12, 6, key="scale")
@@ -211,12 +270,21 @@ for i, batch in enumerate(label_batches, 1):
     preview = img.resize((img.width * scale, img.height * scale), Image.NEAREST)
     st.markdown(f"**Label {i}/{len(label_batches)}** — {len(batch)} circle(s)")
     st.image(preview.convert("RGB"))
+
     buf = io.BytesIO()
     img.save(buf, format="PNG")
-    st.download_button(
+    c_dl, c_print = st.columns([1, 1])
+    c_dl.download_button(
         "Download 1:1 PNG",
         buf.getvalue(),
         f"label_{i}.png",
         "image/png",
         key=f"dl_{i}",
     )
+    if c_print.button("🖨 Print", key=f"print_{i}"):
+        try:
+            with st.spinner(f"Printing label {i} on {printer_port}…"):
+                _print_image(img, printer_port, cfg)
+            st.success(f"Sent label {i} to {printer_port}")
+        except Exception as e:
+            st.error(f"Print failed: {e}")
