@@ -1,22 +1,33 @@
-"""Label skeleton generator for round (vial) labels.
+"""Label skeleton generator.
 
-Renders a rectangular label bitmap containing N circles side-by-side, each with
-three text lines (top / middle / bottom). Shape, circle layout, and per-line
-font/bold/italic/underline/default are driven by LabelConfig so the skeleton
-can be swapped for different label sizes or shapes later.
+Produces a rectangular label bitmap containing an X×Y grid of cells, each
+rendered by a type-specific "skeleton" renderer. Currently two types:
+
+- VIAL_TOP : circle outline (for round cutouts) with a vertical stack of N text lines inside.
+- TEXT     : optional rectangle outline with a vertical stack of N text lines.
+
+Shared pieces: the LineConfig (font / size / bold / italic / underline /
+underline_offset / default_text), cell grid geometry, and the _render_lines
+helper that stacks lines vertically centred on a cell's midpoint.
 """
 from __future__ import annotations
 
 import csv
 import tomllib
 from dataclasses import dataclass, field, fields
+from enum import Enum
 from pathlib import Path
-from typing import Iterable, Iterator
+from typing import Callable, Iterable, Iterator
 
 from PIL import Image, ImageDraw, ImageFont
 
 
-# ---------------------------- Config dataclasses ----------------------------
+# ---------------------------- Types ----------------------------
+
+
+class SkeletonType(str, Enum):
+    VIAL_TOP = "VIAL_TOP"
+    TEXT = "TEXT"
 
 
 @dataclass
@@ -26,36 +37,36 @@ class LineConfig:
     bold: bool = False
     italic: bool = False
     underline: bool = False
-    underline_offset_px: int = 0  # extra gap between text bottom and underline
-    default_text: str = ""  # rendered when the CSV cell is empty
+    underline_offset_px: int = 0
+    default_text: str = ""
 
 
 @dataclass
 class LabelConfig:
+    type: str = SkeletonType.VIAL_TOP.value
+
     # Label paper
     width_mm: float = 36.0
     height_mm: float = 30.0
     dots_per_mm: int = 8
 
-    # Circle layout
-    circle_diameter_mm: float = 14.5
-    circle_count: int = 2
+    # Grid (X columns × Y rows of cells on a single physical label)
+    count_x: int = 2
+    count_y: int = 1
+    gap_mm: float = 0.0
+
+    # Common styling
     outline_px: int = 1
-    horizontal_gap_mm: float = 0.0
     line_gap_px: int = 1
 
-    # Per-line styling
-    top: LineConfig = field(
-        default_factory=lambda: LineConfig(size_px=28, underline=True)
-    )
-    middle: LineConfig = field(
-        default_factory=lambda: LineConfig(size_px=56, underline=False)
-    )
-    bottom: LineConfig = field(
-        default_factory=lambda: LineConfig(
-            size_px=28, underline=True, default_text="        "
-        )
-    )
+    # Lines stacked inside every cell
+    lines: list[LineConfig] = field(default_factory=list)
+
+    # VIAL_TOP-specific
+    circle_diameter_mm: float = 14.5
+
+    # Printer
+    printer_port: str = "COM4"
 
     @property
     def width_dots(self) -> int:
@@ -66,33 +77,32 @@ class LabelConfig:
         return round(self.height_mm * self.dots_per_mm)
 
     @property
+    def gap_dots(self) -> int:
+        return round(self.gap_mm * self.dots_per_mm)
+
+    @property
     def circle_diameter_dots(self) -> int:
         return round(self.circle_diameter_mm * self.dots_per_mm)
 
     @property
-    def horizontal_gap_dots(self) -> int:
-        return round(self.horizontal_gap_mm * self.dots_per_mm)
+    def cells_per_label(self) -> int:
+        return self.count_x * self.count_y
 
     @classmethod
     def from_toml(cls, path: str | Path) -> "LabelConfig":
         with open(path, "rb") as f:
             data = tomllib.load(f)
         line_fields = {f.name for f in fields(LineConfig)}
-
-        def _mk(name: str) -> LineConfig:
-            section = data.pop(name, {}) or {}
-            return LineConfig(**{k: v for k, v in section.items() if k in line_fields})
-
-        top = _mk("top")
-        middle = _mk("middle")
-        bottom = _mk("bottom")
-        excluded = {"top", "middle", "bottom"}
-        valid = {f.name for f in fields(cls) if f.name not in excluded}
+        raw_lines = data.pop("lines", []) or []
+        line_cfgs = [
+            LineConfig(**{k: v for k, v in entry.items() if k in line_fields})
+            for entry in raw_lines
+        ]
+        valid = {f.name for f in fields(cls) if f.name != "lines"}
         base = {k: v for k, v in data.items() if k in valid}
-        return cls(**base, top=top, middle=middle, bottom=bottom)
+        return cls(**base, lines=line_cfgs)
 
     def to_toml(self, path: str | Path) -> None:
-        """Atomically write this config to a TOML file."""
         path = Path(path)
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(_dump_toml(self), encoding="utf-8")
@@ -110,31 +120,40 @@ def _toml_value(v) -> str:
     raise TypeError(f"Cannot serialize {type(v).__name__} to TOML")
 
 
-def _dump_toml(cfg: "LabelConfig") -> str:
-    base_keys = [
-        "width_mm", "height_mm", "dots_per_mm",
-        "circle_diameter_mm", "circle_count", "outline_px",
-        "horizontal_gap_mm", "line_gap_px",
+def _dump_toml(cfg: LabelConfig) -> str:
+    out: list[str] = [
+        "# Label skeleton configuration — auto-saved by preview_app.py.",
+        "",
+        f"type = {_toml_value(cfg.type)}",
+        "",
+        "# Label paper",
+        f"width_mm = {_toml_value(cfg.width_mm)}",
+        f"height_mm = {_toml_value(cfg.height_mm)}",
+        f"dots_per_mm = {_toml_value(cfg.dots_per_mm)}",
+        "",
+        "# Grid",
+        f"count_x = {_toml_value(cfg.count_x)}",
+        f"count_y = {_toml_value(cfg.count_y)}",
+        f"gap_mm = {_toml_value(cfg.gap_mm)}",
+        "",
+        "# Common",
+        f"outline_px = {_toml_value(cfg.outline_px)}",
+        f"line_gap_px = {_toml_value(cfg.line_gap_px)}",
+        "",
+        "# VIAL_TOP specific",
+        f"circle_diameter_mm = {_toml_value(cfg.circle_diameter_mm)}",
+        "",
+        "# Printer",
+        f"printer_port = {_toml_value(cfg.printer_port)}",
     ]
     line_keys = [f.name for f in fields(LineConfig)]
-    out = ["# Label skeleton configuration — auto-saved by preview_app.py.", ""]
-    for k in base_keys:
-        out.append(f"{k} = {_toml_value(getattr(cfg, k))}")
-    for section in ("top", "middle", "bottom"):
-        lc = getattr(cfg, section)
+    for lc in cfg.lines:
         out.append("")
-        out.append(f"[{section}]")
+        out.append("[[lines]]")
         for k in line_keys:
             out.append(f"{k} = {_toml_value(getattr(lc, k))}")
     out.append("")
     return "\n".join(out)
-
-
-@dataclass
-class CircleText:
-    top: str = ""
-    middle: str = ""
-    bottom: str = ""
 
 
 # ---------------------------- Font loading ----------------------------
@@ -158,54 +177,81 @@ def _load_font(path: str, size_px: int):
 
 # ---------------------------- Rendering ----------------------------
 
+# Each cell is a list of per-line strings. Rendering pads with "" if shorter
+# than len(cfg.lines) and truncates if longer.
+Cell = list[str]
 
-def render_label(circles: list[CircleText], cfg: LabelConfig) -> Image.Image:
-    """Render one physical label; draws only the circles provided (no padding)."""
-    if len(circles) > cfg.circle_count:
-        raise ValueError(
-            f"Got {len(circles)} circles but cfg.circle_count = {cfg.circle_count}"
-        )
+
+def render_label(cells: list[Cell], cfg: LabelConfig) -> Image.Image:
+    """Render one physical label. Only the cells passed are drawn; missing
+    grid slots are left blank (the skeleton outline is not drawn for them)."""
+    max_cells = cfg.cells_per_label
+    if len(cells) > max_cells:
+        raise ValueError(f"{len(cells)} cells provided but grid fits {max_cells}")
+
+    renderer = _CELL_RENDERERS.get(cfg.type)
+    if renderer is None:
+        raise ValueError(f"Unknown skeleton type: {cfg.type!r}")
 
     W, H = cfg.width_dots, cfg.height_dots
-    img = Image.new("1", (W, H), 1)  # mode '1': 0=black, 1=white
+    img = Image.new("1", (W, H), 1)
     draw = ImageDraw.Draw(img)
 
-    d = cfg.circle_diameter_dots
-    r = d / 2
-    gap = cfg.horizontal_gap_dots
-    # Layout assumes the full slot count so earlier labels and short
-    # trailing labels keep circles at the same horizontal positions.
-    total_w = d * cfg.circle_count + gap * (cfg.circle_count - 1)
-    start_x = (W - total_w) / 2
-    cy = H / 2
+    gap = cfg.gap_dots
+    cell_w = (W - gap * (cfg.count_x - 1)) / cfg.count_x
+    cell_h = (H - gap * (cfg.count_y - 1)) / cfg.count_y
 
-    for i, ct in enumerate(circles):
-        cx = start_x + r + i * (d + gap)
-        draw.ellipse(
-            (cx - r, cy - r, cx - r + d - 1, cy - r + d - 1),
-            outline=0,
-            width=cfg.outline_px,
-        )
-        _render_text_in_circle(img, draw, (cx, cy), ct, cfg)
+    for i, cell in enumerate(cells):
+        x_idx = i % cfg.count_x
+        y_idx = i // cfg.count_x
+        cx = cell_w / 2 + x_idx * (cell_w + gap)
+        cy = cell_h / 2 + y_idx * (cell_h + gap)
+        renderer(img, draw, (cx, cy), (cell_w, cell_h), cell, cfg)
 
     return img
 
 
-def _render_text_in_circle(img, draw, center, ct: CircleText, cfg: LabelConfig):
+def _render_vial_top(img, draw, center, cell_dims, cell_lines, cfg: LabelConfig):
     cx, cy = center
-    gap = cfg.line_gap_px
+    d = cfg.circle_diameter_dots
+    r = d / 2
+    if cfg.outline_px > 0:
+        draw.ellipse(
+            (cx - r, cy - r, cx - r + d - 1, cy - r + d - 1),
+            outline=0, width=cfg.outline_px,
+        )
+    _render_lines(img, draw, (cx, cy), cell_lines, cfg.lines, cfg.line_gap_px)
 
-    mid_y = cy - cfg.middle.size_px / 2
-    top_y = mid_y - gap - cfg.top.size_px
-    bot_y = mid_y + cfg.middle.size_px + gap
 
-    font_top = _load_font(cfg.top.font_path, cfg.top.size_px)
-    font_mid = _load_font(cfg.middle.font_path, cfg.middle.size_px)
-    font_bot = _load_font(cfg.bottom.font_path, cfg.bottom.size_px)
+def _render_text(img, draw, center, cell_dims, cell_lines, cfg: LabelConfig):
+    cx, cy = center
+    cell_w, cell_h = cell_dims
+    if cfg.outline_px > 0:
+        draw.rectangle(
+            (cx - cell_w / 2, cy - cell_h / 2,
+             cx + cell_w / 2 - 1, cy + cell_h / 2 - 1),
+            outline=0, width=cfg.outline_px,
+        )
+    _render_lines(img, draw, (cx, cy), cell_lines, cfg.lines, cfg.line_gap_px)
 
-    _draw_line(img, draw, (cx, top_y), ct.top, cfg.top, font_top)
-    _draw_line(img, draw, (cx, mid_y), ct.middle, cfg.middle, font_mid)
-    _draw_line(img, draw, (cx, bot_y), ct.bottom, cfg.bottom, font_bot)
+
+_CELL_RENDERERS: dict[str, Callable] = {
+    SkeletonType.VIAL_TOP.value: _render_vial_top,
+    SkeletonType.TEXT.value: _render_text,
+}
+
+
+def _render_lines(img, draw, center, cell_lines, line_cfgs, line_gap_px):
+    if not line_cfgs:
+        return
+    cx, cy = center
+    total_h = sum(lc.size_px for lc in line_cfgs) + line_gap_px * (len(line_cfgs) - 1)
+    y = cy - total_h / 2
+    for i, lc in enumerate(line_cfgs):
+        text = cell_lines[i] if i < len(cell_lines) else ""
+        font = _load_font(lc.font_path, lc.size_px)
+        _draw_line(img, draw, (cx, y), text, lc, font)
+        y += lc.size_px + line_gap_px
 
 
 def _draw_line(img, draw, xy, text: str, lc: LineConfig, font):
@@ -238,9 +284,6 @@ def _draw_line(img, draw, xy, text: str, lc: LineConfig, font):
 def _render_text_image(
     text: str, font, bold: bool = False, italic: bool = False, shear: float = 0.2
 ) -> Image.Image:
-    """Render text onto a new mode-'L' image (bg=255, text=0), optionally
-    stroked for bold and sheared for italic.
-    """
     stroke = 1 if bold else 0
     left, top, right, bottom = font.getbbox(text, stroke_width=stroke)
     pad = 2
@@ -257,10 +300,6 @@ def _render_text_image(
     )
     if italic:
         extra = int(h * shear) + 1
-        # PIL affine reads input at (a*x + b*y + c, d*x + e*y + f) for each output pixel.
-        # With (1, shear, -extra, 0, 1, 0): lookup_x = x + shear*y - extra, so the
-        # top row (y=0) reads from x-extra (shifted left in source -> shifted right visually),
-        # bottom row reads from x. Produces a rightward lean.
         img = img.transform(
             (w + extra, h),
             Image.AFFINE,
@@ -271,41 +310,31 @@ def _render_text_image(
     return img
 
 
-# ---------------------------- CSV + batching ----------------------------
+# ---------------------------- CSV ----------------------------
 
 
-def circles_from_csv(path: str | Path, skip_header: bool = True) -> list[CircleText]:
-    """One CSV row = one circle. Columns: top, middle, bottom."""
+def cells_from_csv(path: str | Path, skip_header: bool = True) -> list[Cell]:
+    """One CSV row = one cell. Columns map positionally onto cfg.lines."""
     with open(path, newline="", encoding="utf-8") as f:
         rows = list(csv.reader(f))
     if skip_header and rows:
         rows = rows[1:]
-    return [
-        CircleText(
-            top=(row[0] if len(row) > 0 else ""),
-            middle=(row[1] if len(row) > 1 else ""),
-            bottom=(row[2] if len(row) > 2 else ""),
-        )
-        for row in rows
-        if any(c.strip() for c in row)
-    ]
+    return [list(row) for row in rows if any(c.strip() for c in row)]
 
 
-def pack_circles_to_labels(
-    circles: Iterable[CircleText], per_label: int
-) -> list[list[CircleText]]:
-    """Split into chunks of `per_label`. The last chunk may be shorter; render_label
-    then draws only the circles present and leaves unused slots blank."""
-    circles = list(circles)
-    return [circles[i : i + per_label] for i in range(0, len(circles), per_label)]
+def pack_cells_to_labels(cells: Iterable[Cell], per_label: int) -> list[list[Cell]]:
+    cells = list(cells)
+    return [cells[i : i + per_label] for i in range(0, len(cells), per_label)]
 
 
 def render_labels_from_csv(
     csv_path: str | Path, cfg: LabelConfig
 ) -> Iterator[Image.Image]:
-    """Yield a PIL Image for every physical label produced by the CSV.
-    Used by both the Streamlit preview and print_labels.py so the two stay in sync.
-    """
-    circles = circles_from_csv(csv_path)
-    for batch in pack_circles_to_labels(circles, cfg.circle_count):
+    cells = cells_from_csv(csv_path)
+    for batch in pack_cells_to_labels(cells, cfg.cells_per_label):
         yield render_label(batch, cfg)
+
+
+def csv_path_for(config_path: str | Path) -> Path:
+    """Sibling .csv of a given .toml config path."""
+    return Path(config_path).with_suffix(".csv")

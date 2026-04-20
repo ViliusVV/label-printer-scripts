@@ -1,0 +1,41 @@
+# Label skeleton configuration — auto-saved by preview_app.py.
+
+type = "VIAL_TOP"
+
+# Label paper
+width_mm = 36.0
+height_mm = 30.0
+dots_per_mm = 8
+
+# Grid
+count_x = 2
+count_y = 1
+gap_mm = 0.0
+
+# Common
+outline_px = 1
+line_gap_px = 0
+
+# VIAL_TOP specific
+circle_diameter_mm = 14.5
+
+# Printer
+printer_port = "COM4"
+
+[[lines]]
+font_path = "C:/Windows/Fonts/verdanab.ttf"
+size_px = 40
+bold = true
+italic = false
+underline = false
+underline_offset_px = 0
+default_text = ""
+
+[[lines]]
+font_path = "C:/Windows/Fonts/verdana.ttf"
+size_px = 24
+bold = false
+italic = false
+underline = false
+underline_offset_px = 0
+default_text = ""
