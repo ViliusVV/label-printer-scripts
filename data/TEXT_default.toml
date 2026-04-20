@@ -14,32 +14,37 @@ gap_mm = -0.135
 
 # Common
 outline_px = 1
-line_gap_px = 0
 
 # VIAL_TOP specific
 circle_diameter_mm = 14.5
 
 # TEXT specific
 text_width_mm = 10.0
-text_height_mm = 10.0
+text_height_mm = 7.0
 
 # Printer
 printer_port = "COM4"
 
 [[lines]]
-font_path = "C:/Windows/Fonts/verdanab.ttf"
-size_px = 40
-bold = true
+name = "Top"
+font_path = "C:/Windows/Fonts/consolab.ttf"
+size_px = 23
+bold = false
 italic = false
-underline = false
+underline = true
 underline_offset_px = 0
+offset_x_px = 0
+offset_y_px = -18
 default_text = ""
 
 [[lines]]
-font_path = "C:/Windows/Fonts/verdana.ttf"
-size_px = 24
+name = "Bottom"
+font_path = "C:/Windows/Fonts/Candarab.ttf"
+size_px = 13
 bold = false
 italic = false
 underline = false
 underline_offset_px = 0
+offset_x_px = 0
+offset_y_px = 20
 default_text = ""

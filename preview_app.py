@@ -213,7 +213,16 @@ with st.sidebar.expander("Lines", expanded=True):
     )
 
 
-def _line_controls(idx: int, defaults: LineConfig) -> LineConfig:
+def _clamp(v: int, lo: int, hi: int) -> int:
+    return max(lo, min(hi, v))
+
+
+def _line_controls(
+    idx: int,
+    defaults: LineConfig,
+    cell_w_dots: int,
+    cell_h_dots: int,
+) -> LineConfig:
     k = f"{prefix}_line{idx}"
     with st.sidebar.expander(line_display_name(defaults, idx), expanded=False):
         name = st.text_input(
@@ -235,16 +244,19 @@ def _line_controls(idx: int, defaults: LineConfig) -> LineConfig:
             "Underline offset (px)", -10, 30,
             value=int(defaults.underline_offset_px), key=f"{k}_ul_offset",
         )
-        ox, oy = st.columns(2)
-        offset_x_px = ox.number_input(
+        x_max = max(1, cell_w_dots // 2)
+        y_max = max(1, cell_h_dots // 2)
+        offset_x_px = st.slider(
             "X offset from cell centre (px)",
-            -400, 400,
-            value=int(defaults.offset_x_px), key=f"{k}_offset_x",
+            -x_max, x_max,
+            value=_clamp(int(defaults.offset_x_px), -x_max, x_max),
+            key=f"{k}_offset_x",
         )
-        offset_y_px = oy.number_input(
+        offset_y_px = st.slider(
             "Y offset from cell centre (px)",
-            -400, 400,
-            value=int(defaults.offset_y_px), key=f"{k}_offset_y",
+            -y_max, y_max,
+            value=_clamp(int(defaults.offset_y_px), -y_max, y_max),
+            key=f"{k}_offset_y",
         )
         default_text = st.text_input(
             "Default when empty", value=defaults.default_text, key=f"{k}_default"
@@ -263,8 +275,23 @@ def _line_controls(idx: int, defaults: LineConfig) -> LineConfig:
     )
 
 
+# Cell bounding box in dots (per type) — used to bound each line's X/Y offset sliders.
+_dpm = int(dots_per_mm)
+if cfg_type == SkeletonType.VIAL_TOP.value:
+    _cell_w_dots = _cell_h_dots = round(circle_diameter_mm * _dpm)
+elif cfg_type == SkeletonType.TEXT.value:
+    _cell_w_dots = round(text_width_mm * _dpm)
+    _cell_h_dots = round(text_height_mm * _dpm)
+else:
+    _cell_w_dots = _cell_h_dots = 100
+
 lines = [
-    _line_controls(i, initial.lines[i] if i < len(initial.lines) else LineConfig())
+    _line_controls(
+        i,
+        initial.lines[i] if i < len(initial.lines) else LineConfig(),
+        _cell_w_dots,
+        _cell_h_dots,
+    )
     for i in range(int(n_lines))
 ]
 
