@@ -1,42 +1,30 @@
-"""Quick preview: renders the first physical label from labels.csv and
-opens it in the OS default image viewer.
+"""Quick one-shot preview: renders every physical label from labels.csv,
+saves each to preview_N.png, and opens the first in the OS image viewer.
 
 Run:  python preview.py
 """
 from PIL import Image
 
-from labels import (
-    CircleText,
-    LabelConfig,
-    circles_from_csv,
-    pack_circles_to_labels,
-    render_label,
-)
+from labels import LabelConfig, render_labels_from_csv
 
-SCALE = 6  # upscale factor for on-screen viewing (uses nearest-neighbour)
+SCALE = 6
 
 
 def main():
     cfg = LabelConfig.from_toml("config.toml")
-    try:
-        circles = circles_from_csv("labels.csv")
-    except FileNotFoundError:
-        circles = [
-            CircleText(top="R1", middle="10k", bottom="1%"),
-            CircleText(top="C1", middle="100n", bottom=""),
-        ]
-
-    labels = pack_circles_to_labels(circles, cfg.circle_count)
-    if not labels:
-        print("No labels to render.")
+    images = list(render_labels_from_csv("labels.csv", cfg))
+    if not images:
+        print("No labels rendered — labels.csv empty?")
         return
 
-    img = render_label(labels[0], cfg)
-    img.save("preview.png")
-    preview = img.resize((img.width * SCALE, img.height * SCALE), Image.NEAREST)
-    preview.show()
-    print(f"Rendered {len(labels)} physical label(s); showing label 1 of {len(labels)}.")
-    print(f"Saved 1:1 bitmap to preview.png ({img.width}x{img.height} dots).")
+    for i, img in enumerate(images, 1):
+        img.save(f"preview_{i}.png")
+
+    print(f"Rendered {len(images)} label(s); saved preview_1..{len(images)}.png")
+    first = images[0]
+    first.resize(
+        (first.width * SCALE, first.height * SCALE), Image.NEAREST
+    ).show()
 
 
 if __name__ == "__main__":

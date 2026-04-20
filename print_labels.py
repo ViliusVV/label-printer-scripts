@@ -2,12 +2,7 @@
 
 Run:  python print_labels.py
 """
-from labels import (
-    LabelConfig,
-    circles_from_csv,
-    pack_circles_to_labels,
-    render_label,
-)
+from labels import LabelConfig, render_labels_from_csv
 from printer import HAlign, LabelPrinter, VAlign
 
 CFG_PATH = "config.toml"
@@ -17,8 +12,7 @@ PORT = "COM4"
 
 def main():
     cfg = LabelConfig.from_toml(CFG_PATH)
-    circles = circles_from_csv(CSV_PATH)
-    labels = pack_circles_to_labels(circles, cfg.circle_count)
+    images = list(render_labels_from_csv(CSV_PATH, cfg))
 
     printer = LabelPrinter(
         PORT,
@@ -26,9 +20,8 @@ def main():
         label_height_mm=cfg.height_mm,
     )
     try:
-        for i, batch in enumerate(labels, 1):
-            img = render_label(batch, cfg)
-            print(f"Printing label {i}/{len(labels)}")
+        for i, img in enumerate(images, 1):
+            print(f"Printing label {i}/{len(images)}")
             printer.print_bitmap(img, halign=HAlign.LEFT, valign=VAlign.TOP)
             printer.next_label()
     finally:
