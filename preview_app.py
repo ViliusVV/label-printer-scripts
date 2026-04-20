@@ -10,12 +10,14 @@ Run:  uv run streamlit run preview_app.py
 """
 from __future__ import annotations
 
+import base64
 import csv as csv_mod
 import io
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image, ImageFont
 
 from labels import (
@@ -267,16 +269,32 @@ for i, batch in enumerate(label_batches, 1):
     except Exception as e:
         st.error(f"Label {i}: {e}")
         continue
-    preview = img.resize((img.width * scale, img.height * scale), Image.NEAREST)
-    st.markdown(f"**Label {i}/{len(label_batches)}** — {len(batch)} circle(s)")
-    st.image(preview.convert("RGB"))
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
-    c_dl, c_print = st.columns([1, 1])
+    png_bytes = buf.getvalue()
+    b64 = base64.b64encode(png_bytes).decode()
+    display_w = img.width * scale
+
+    st.markdown(
+        f"<div style='text-align:center'><b>Label {i}/{len(label_batches)}</b> "
+        f"— {len(batch)} circle(s)</div>",
+        unsafe_allow_html=True,
+    )
+    display_h = img.height * scale
+    components.html(
+        f"<div style='text-align:center;padding:4px 0;'>"
+        f"<img src='data:image/png;base64,{b64}' "
+        f"style='width:{display_w}px;height:{display_h}px;max-width:none;"
+        f"image-rendering:pixelated;image-rendering:crisp-edges;'/></div>",
+        height=display_h + 16,
+        scrolling=True,
+    )
+
+    _, c_dl, c_print, _ = st.columns([2, 1, 1, 2])
     c_dl.download_button(
         "Download 1:1 PNG",
-        buf.getvalue(),
+        png_bytes,
         f"label_{i}.png",
         "image/png",
         key=f"dl_{i}",
