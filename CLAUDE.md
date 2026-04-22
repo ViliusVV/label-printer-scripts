@@ -44,13 +44,14 @@ Quirks that must be preserved when editing:
 
 ### Rendering layer (`labels.py`)
 
-`LabelConfig` (TOML-backed via `from_toml`/`to_toml`) owns the full skeleton spec. It has three parts:
+`LabelConfig` (TOML-backed via `from_toml`/`to_toml`) owns the full skeleton spec. It has four parts:
 
-- **Common**: `type`, label paper (`width_mm`, `height_mm`, `dots_per_mm`), grid (`count_x`, `count_y`, `gap_mm`), `outline_px`, `line_gap_px`, `printer_port`.
-- **Lines**: `lines: list[LineConfig]` — N lines stacked vertically inside every cell. Each `LineConfig` carries `name` (UI/CSV-column label; falls back to `Line N` via `line_display_name`), `font_path`, `size_px`, `bold`, `italic`, `underline`, `underline_offset_px`, `default_text`.
-- **Type-specific**: currently only `circle_diameter_mm` (used by VIAL_TOP; preserved but ignored for other types).
+- **Common**: `type`, label paper (`width_mm`, `height_mm`, `dots_per_mm`), grid (`count_x`, `count_y`, `gap_mm`), `outline_px`, `printer_port`.
+- **Lines**: `lines: list[LineConfig]` — N lines placed inside every cell. Each `LineConfig` carries `name` (UI/CSV-column label; falls back to `Line N` via `line_display_name`), `font_path`, `size_px`, `bold`, `italic`, `underline`, `underline_offset_px`, `offset_x_px`, `offset_y_px`, `default_text`.
+- **Type-specific**: `circle_diameter_mm` (VIAL_TOP) and `text_width_mm` / `text_height_mm` (TEXT). Unused fields are preserved as-is when another type is active, so switching back doesn't lose state.
+- **Manual matrix**: `manual: list[list[str]]` — row-major `cells_per_label × len(lines)` grid of strings persisted from the Streamlit Manual-source UI. Jagged rows and out-of-range indices default to `""`.
 
-`SkeletonType` (enum) → `_CELL_RENDERERS` dispatch table (`str → callable`). Adding a new type = add an enum value, write `_render_<name>(img, draw, center, cell_dims, cell_lines, cfg)`, register it. Both existing renderers finish by calling `_render_lines` so the N-line stacking logic stays shared.
+`SkeletonType` (enum) → `_CELL_RENDERERS` dispatch table (`str → callable`). Adding a new type = add an enum value, write `_render_<name>(img, draw, center, cell_dims, cell_lines, cfg)`, register it. Both existing renderers finish by calling `_render_lines` so the per-line offset/styling logic stays shared.
 
 Data flow:
 
@@ -65,19 +66,22 @@ Key design rules:
 
 - **Short final batches are intentional.** `render_label` loops only over the cells provided; unused grid slots draw nothing (no outline, no text). This is how "don't render a circle if there aren't enough CSV entries" is satisfied — and it generalises to 2-D grids.
 - **Grid uses the type-specific cell bounding box, NOT an even slice of the label.** `_cell_box_dots(cfg)` returns `(circle_diameter, circle_diameter)` for VIAL_TOP and `(text_width, text_height)` for TEXT. The full `count_x × count_y` block is centred in the label. `gap_mm` (between cells) may be **negative** so that adjacent outlines overlap into a single shared line (e.g. `gap_mm = -0.125` on an 8 dpmm printer shares a 1-px edge between rectangles — use this to avoid doubled borders). Cells are filled **row-major** (left-to-right, top-to-bottom).
-- `_render_lines` stacks lines vertically and centres the stack on the cell's midpoint. For N=3 with sizes 28/56/28 this is equivalent to the older "middle line anchored at centre" behaviour, but it generalises to any N.
+- **Lines are positioned, not stacked.** `_render_lines` draws each line at `(cell_cx + lc.offset_x_px, cell_cy + lc.offset_y_px)`. `_draw_line` uses PIL anchor `"mm"` (middle-middle), so the offset point is the text's visual centre; underline y becomes `cy + size_px/2 + underline_offset_px`. There is no auto gap/stacking — explicit offsets only.
 - Bold → PIL `stroke_width=1`. Italic → render text to a temp `L` image, apply affine shear (0.2), paste through a mask. Both paths funnel through `_draw_line`; see `_render_text_image`.
 - Empty cells on a line with a non-empty `default_text` render the default (with its underline, if any) — this is the blank-writing-line placeholder for vial bottom rows.
 - Fonts are cached module-level in `_font_cache` keyed by `(path, size_px)`. Call `_load_font` rather than `ImageFont.truetype` directly.
+- **TOML write order matters.** `_dump_toml` must emit root-level keys (including `manual = [...]`) **before** any `[[lines]]` table. TOML attaches trailing keys to the most recent table, so putting `manual` after `[[lines]]` silently makes it a field of the last line config — and `tomllib` will then return `data["manual"] == None`. `_toml_value` recurses into lists so nested `list[list[str]]` serialises correctly.
 
 `render_labels_from_csv` is the shared entry point used by `print_labels.py`, `preview.py`, and the Streamlit app — changes to the CSV → bitmap pipeline must keep all three working.
 
 ### Streamlit app (`preview_app.py`)
 
 - **Config picker** lists `data/*.toml`. All widget keys are prefixed with the config's file stem (`f"{prefix}_..."`), so switching configs gives the new file a fresh widget-state namespace and its values are loaded as defaults.
-- **Auto-persists** both the config TOML and its sibling CSV on every rerun (atomic tmp + rename). Sidebar values rebuild a fresh `LabelConfig`; the CSV data editor's current state is written back.
+- **Auto-persist order matters.** The TOML save is deliberately done **after** the text-source block so that `cfg.manual` has been updated from the current Manual-mode inputs before being written. Keep this order when refactoring — saving earlier will drop manual-matrix edits. CSV saves go to the sibling `.csv`; both writes use tmp + atomic rename.
 - **Dynamic lines**: a "Number of lines" input controls how many `LineConfig` editors appear; the CSV editor's column set follows suit (`line_1`, `line_2`, …). Changing line count changes the data-editor key so its schema resets cleanly.
-- **Type-specific UI**: when `type = VIAL_TOP`, a "Circle diameter" input appears. Other types' extras live behind similar type-conditional expanders — add new ones there, not at the top.
+- **Per-line X/Y offset sliders** are bounded to ±(cell bounding box / 2), computed from the *current* sidebar values (`circle_diameter_mm` for VIAL_TOP, `text_width/height_mm` for TEXT). Saved offsets outside the new range are clamped with `_clamp(...)` before being passed to `st.slider` — otherwise Streamlit raises on an out-of-range `value=`.
+- **Manual source** pre-fills each `text_input` from `initial.manual[i][j]` (out-of-range defaults to `""`), then captures the current widget values into `cfg.manual` before the save. CSV mode preserves `cfg.manual = initial.manual` untouched, so switching sources doesn't lose either side.
+- **Type-specific UI**: when `type = VIAL_TOP`, a "Circle diameter" input appears; when `type = TEXT`, a "Text box width/height" pair appears. Other types' extras live behind similar type-conditional expanders — add new ones there, not at the top.
 - Font picker scans `C:/Windows/Fonts/*.{ttf,otf}` once (`@st.cache_data`) and maps each file's `(family, style)` from `ImageFont.getname()` to its path. A config path not in the scan is prepended as `(custom) filename`.
 - Label bitmaps are embedded through `streamlit.components.v1.html` (not `st.image`) to bypass Streamlit's `img { max-width: 100% }` rule — this is what makes the display-scale slider keep working past ~4×. `image-rendering: pixelated` preserves the printer-dot grid.
 - Per-label "🖨 Print" button opens a fresh `LabelPrinter` on the config's `printer_port`, prints, and closes — do not try to keep a printer instance alive in session state (Bluetooth serial doesn't survive Streamlit's rerun model cleanly).
