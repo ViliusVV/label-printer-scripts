@@ -59,12 +59,11 @@ class Cmd(Enum):
     # 0xCB = 203 ≈ 8 dots/mm so GS L / GS W / GS $ etc. take dot counts directly.
     SET_MOTION_UNITS_DOTS = b"\x1d\x50\xcb\xcb"
 
-
-# Operand-carrying command prefixes. The trailing operand bytes are appended
-# at call time. Keeping them as named constants makes wire reads easier.
-_GS_L_SET_LEFT_MARGIN: bytes = b"\x1d\x4c"
-_GS_W_SET_PRINT_WIDTH: bytes = b"\x1d\x57"
-_GS_V_RASTER_BIT_IMAGE: bytes = b"\x1d\x76\x30\x00"  # GS v 0, m=0 (normal)
+    # Operand-carrying command prefixes. The trailing operand bytes are appended
+    # at call time. Keeping them as named constants makes wire reads easier.
+    GS_L_SET_LEFT_MARGIN = b"\x1d\x4c"
+    GS_W_SET_PRINT_WIDTH = b"\x1d\x57"
+    GS_V_RASTER_BIT_IMAGE = b"\x1d\x76\x30\x00"  # GS v 0, m=0 (normal)
 
 
 # ---------------------------- LabelPrinter ----------------------------
@@ -124,8 +123,8 @@ class LabelPrinter:
             width_dots,
             left_margin_dots + width_dots,
         )
-        self.send(_GS_L_SET_LEFT_MARGIN, left_margin_dots.to_bytes(2, "little"))
-        self.send(_GS_W_SET_PRINT_WIDTH, width_dots.to_bytes(2, "little"))
+        self.send(Cmd.GS_L_SET_LEFT_MARGIN, left_margin_dots.to_bytes(2, "little"))
+        self.send(Cmd.GS_W_SET_PRINT_WIDTH, width_dots.to_bytes(2, "little"))
 
     @property
     def width_dots(self) -> int:
@@ -187,7 +186,7 @@ class LabelPrinter:
                     raster[out_y * width_bytes + (px >> 3)] |= 0x80 >> (px & 7)
 
         header = (
-            _GS_V_RASTER_BIT_IMAGE
+            Cmd.GS_V_RASTER_BIT_IMAGE.value
             + width_bytes.to_bytes(2, "little")
             + label_h.to_bytes(2, "little")
         )
