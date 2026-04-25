@@ -47,8 +47,8 @@ class LabelConfig:
     type: str = SkeletonType.VIAL_TOP.value
 
     # Label paper
-    width_mm: float = 36.0
-    height_mm: float = 30.0
+    width_mm: int = 36
+    height_mm: int = 30
     dots_per_mm: int = 8
 
     # Grid (X columns × Y rows of cells on a single physical label)

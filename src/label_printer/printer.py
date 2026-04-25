@@ -80,9 +80,13 @@ class LabelPrinter:
         self,
         port: str,
         baud: int = 9600,
-        label_width_mm: float = MAX_WIDTH_DOTS // DOTS_PER_MM,
-        label_height_mm: float = 30,
+        label_width_mm: int = MAX_WIDTH_DOTS // DOTS_PER_MM,
+        label_height_mm: int = 30,
     ) -> None:
+        # Check if label is not over limit
+        if label_width_mm > (LabelPrinter.MAX_WIDTH_DOTS // LabelPrinter.DOTS_PER_MM):
+            raise
+
         self.label_width_mm = label_width_mm
         self.label_height_mm = label_height_mm
         self.ser = serial.Serial(port, baud)
@@ -99,7 +103,7 @@ class LabelPrinter:
         log.debug("Sending [%d] commands, data: %r", len(commands), data)
         self.ser.write(data)
 
-    def set_label_size(self, width_mm: float, height_mm: float) -> None:
+    def set_label_size(self, width_mm: int, height_mm: int) -> None:
         self.label_width_mm = width_mm
         self.label_height_mm = height_mm
         log.debug("Setting label size to %sx%s mm", width_mm, height_mm)
