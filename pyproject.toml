@@ -10,3 +10,7 @@ dependencies = [
 
 [project.optional-dependencies]
 preview = ["streamlit>=1.30"]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

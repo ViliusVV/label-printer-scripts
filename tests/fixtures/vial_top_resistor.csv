@@ -1,0 +1,7 @@
+line_1,line_2,line_3
+Resistor,3k6,
+Resistor,1k,
+Resistor,10k,5%
+Resistor,4k7,
+LED,Red,
+Diode,1N4148,

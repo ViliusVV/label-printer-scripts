@@ -3,7 +3,11 @@
     "allow": [
       "Bash(python *)",
       "Bash(uv add *)",
-      "Bash(uv run *)"
+      "Bash(uv run *)",
+      "Bash(uv sync *)",
+      "Bash(uv pip *)",
+      "Bash(rm -f tests/_diffs/text_neg_gap_1.png)",
+      "Bash(rmdir tests/_diffs)"
     ]
   }
 }

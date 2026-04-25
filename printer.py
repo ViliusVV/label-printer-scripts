@@ -41,7 +41,7 @@ class LabelPrinter:
     def __init__(self,
         port: str,
         baud: int = 9600,
-        label_width_mm: int = MAX_WIDTH_DOTS/DOTS_PER_MM,
+        label_width_mm: int = MAX_WIDTH_DOTS//DOTS_PER_MM,
         label_height_mm: int = 30
  ):
         self.label_width_mm = label_width_mm

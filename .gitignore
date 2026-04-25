@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Rendered previews from preview.py + diff dumps from the parity test
+preview_*.png
+tests/_diffs/
