@@ -29,33 +29,33 @@ printer_port = "COM4"
 # Must be written BEFORE [[lines]] — TOML attaches trailing keys to
 # the most recent table.
 manual = [
-  ["aaa", "hjh", "aqw"],
-  ["dd", "vvee", "bgfff"],
+  ["Zener", "10V", ""],
+  ["Schotky", "1N60", ""],
 ]
 
 [[lines]]
 name = "TopLine"
-font_path = "C:/Windows/Fonts/verdanab.ttf"
-size_px = 28
+font_path = "C:/Windows/Fonts/consolab.ttf"
+size_px = 20
 bold = false
 italic = false
 underline = true
 underline_offset_px = 0
 offset_x_px = 0
-offset_y_px = 0
+offset_y_px = -39
 default_text = ""
 
 [[lines]]
 name = "MiddleLine"
-font_path = "C:/Windows/Fonts/verdanab.ttf"
-size_px = 56
+font_path = "C:/Windows/Fonts/consolab.ttf"
+size_px = 30
 bold = false
 italic = false
 underline = false
 underline_offset_px = 0
 offset_x_px = 0
 offset_y_px = 0
-default_text = ""
+default_text = "       "
 
 [[lines]]
 name = "BottomLine"
@@ -66,5 +66,5 @@ italic = false
 underline = true
 underline_offset_px = 0
 offset_x_px = 0
-offset_y_px = 0
+offset_y_px = 26
 default_text = "        "
