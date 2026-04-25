@@ -355,9 +355,10 @@ def _draw_line(img, draw, xy, text: str, lc: LineConfig, font):
             text_w = int(round(font.getlength(effective)))
 
     if lc.underline:
-        tw = text_w if text_w is not None else int(round(font.getlength("0" * 8)))
-        uy = cy + lc.size_px / 2 + lc.underline_offset_px
-        draw.line([(cx - tw / 2, uy), (cx + tw / 2, uy)], fill=0, width=1)
+        tw = text_w if text_w is not None else int(round(font.getlength(effective)))
+        if tw > 0:
+            uy = cy + lc.size_px / 2 + lc.underline_offset_px
+            draw.line([(cx - tw / 2, uy), (cx + tw / 2, uy)], fill=0, width=1)
 
 
 def _render_text_image(
