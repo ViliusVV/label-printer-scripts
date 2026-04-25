@@ -7,19 +7,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Dependency management uses **uv** (`pyproject.toml` + `uv.lock`), Python 3.13+.
 
 ```bash
-uv sync                          # install runtime deps (pillow, pyserial, pyyaml)
-uv sync --extra preview          # also install streamlit for the interactive preview
+uv sync                          # install runtime deps (pillow, pyserial, pyyaml, pandas, streamlit)
 uv sync --extra dev              # also install pytest for the parity test suite
 
 # All entry points take a config path; default is data/VIAL_TOP_default.yaml.
 # The CSV used at runtime is the sibling .csv of the config (e.g. data/VIAL_TOP_default.csv).
 uv run python print_labels.py [data/<name>.yaml]   # render + send every row of the sibling CSV to the printer
 uv run python preview.py       [data/<name>.yaml]  # one-shot render; saves preview_N.png and opens the first
-uv run streamlit run preview_app.py                # interactive preview; picks the config from a dropdown
+uv run print_ui                                    # interactive Streamlit preview (console-script alias for `streamlit run preview_app.py`)
 uv run python main.py                              # dev sandbox (esc_hello / print_circles helpers)
 uv run pytest                                      # bitmap parity tests (tests/test_render_parity.py)
 uv run python tests/generate_golden.py             # regenerate golden PNGs (only when fixtures or renderer change intentionally)
 ```
+
+The `print_ui` script is wired via `[project.scripts]` in `pyproject.toml`; the project itself is a hatchling-built wheel listing the flat-layout modules in `[tool.hatch.build.targets.wheel].include`. `uv run` reinstalls the project on every invocation, so a freshly added module that needs to ship in the wheel must also be added to that list.
 
 No linter is configured. The printer's serial port lives inside each config file (`printer_port`, default `COM4`).
 
@@ -80,7 +81,7 @@ Key design rules:
 ### Streamlit app (`preview_app.py`)
 
 - **Config picker** lists `data/*.yaml`. All widget keys are prefixed with the config's file stem (`f"{prefix}_..."`), so switching configs gives the new file a fresh widget-state namespace and its values are loaded as defaults.
-- **Auto-persist order matters.** The TOML save is deliberately done **after** the text-source block so that `cfg.manual` has been updated from the current Manual-mode inputs before being written. Keep this order when refactoring — saving earlier will drop manual-matrix edits. CSV saves go to the sibling `.csv`; both writes use tmp + atomic rename.
+- **Auto-persist order matters.** The YAML save is deliberately done **after** the text-source block so that `cfg.manual` has been updated from the current Manual-mode inputs before being written. Keep this order when refactoring — saving earlier will drop manual-matrix edits. CSV saves go to the sibling `.csv`; both writes use tmp + atomic rename.
 - **Dynamic lines**: a "Number of lines" input controls how many `LineConfig` editors appear; the CSV editor's column set follows suit (`line_1`, `line_2`, …). Changing line count changes the data-editor key so its schema resets cleanly.
 - **Per-line X/Y offset sliders** are bounded to ±(cell bounding box / 2), computed from the *current* sidebar values (`circle_diameter_mm` for VIAL_TOP, `text_width/height_mm` for TEXT). Saved offsets outside the new range are clamped with `_clamp(...)` before being passed to `st.slider` — otherwise Streamlit raises on an out-of-range `value=`.
 - **Manual source** pre-fills each `text_input` from `initial.manual[i][j]` (out-of-range defaults to `""`), then captures the current widget values into `cfg.manual` before the save. CSV mode preserves `cfg.manual = initial.manual` untouched, so switching sources doesn't lose either side.

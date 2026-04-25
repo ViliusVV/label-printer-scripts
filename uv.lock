@@ -224,30 +224,30 @@ wheels = [
 [[package]]
 name = "label-printer"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
+    { name = "pandas" },
     { name = "pillow" },
     { name = "pyserial" },
     { name = "pyyaml" },
+    { name = "streamlit" },
 ]
 
 [package.optional-dependencies]
 dev = [
     { name = "pytest" },
 ]
-preview = [
-    { name = "streamlit" },
-]
 
 [package.metadata]
 requires-dist = [
+    { name = "pandas", specifier = ">=3.0.2" },
     { name = "pillow", specifier = ">=12.2.0" },
     { name = "pyserial", specifier = ">=3.5" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "pyyaml", specifier = ">=6.0" },
-    { name = "streamlit", marker = "extra == 'preview'", specifier = ">=1.30" },
+    { name = "streamlit", specifier = ">=1.30" },
 ]
-provides-extras = ["preview", "dev"]
+provides-extras = ["dev"]
 
 [[package]]
 name = "markupsafe"
