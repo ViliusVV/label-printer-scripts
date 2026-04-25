@@ -91,17 +91,23 @@ def _render_csv_editor(
     col_names: list[str],
     prefix: str,
 ) -> list[Cell]:
-    try:
-        loaded = cells_from_csv(csv_path)
-    except FileNotFoundError:
-        loaded = []
+    # Cache the editor's input frame in session state. Reloading it from disk
+    # every rerun destabilises st.data_editor's internal diff (keyed against
+    # its input), which drops the in-flight keystroke that triggered the
+    # rerun — manifests as the second edit "disappearing" after Enter.
+    df_state_key = f"{prefix}_csv_df_{n_cols}"
+    if df_state_key not in st.session_state:
+        try:
+            loaded = cells_from_csv(csv_path)
+        except FileNotFoundError:
+            loaded = []
+        st.session_state[df_state_key] = pd.DataFrame(
+            [{col_names[j]: (c[j] if j < len(c) else "") for j in range(n_cols)} for c in loaded],
+            columns=col_names,
+        )
 
-    df_in = pd.DataFrame(
-        [{col_names[j]: (c[j] if j < len(c) else "") for j in range(n_cols)} for c in loaded],
-        columns=col_names,
-    )
     df_edited = st.data_editor(
-        df_in,
+        st.session_state[df_state_key],
         num_rows="dynamic",
         use_container_width=True,
         key=f"{prefix}_csv_editor_{n_cols}",
