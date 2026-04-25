@@ -29,7 +29,7 @@ printer_port = "COM4"
 # Must be written BEFORE [[lines]] — TOML attaches trailing keys to
 # the most recent table.
 manual = [
-  ["aa", "hjh", "aqw"],
+  ["aaa", "hjh", "aqw"],
   ["dd", "vvee", "bgfff"],
 ]
 

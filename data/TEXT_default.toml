@@ -25,6 +25,16 @@ text_height_mm = 7.0
 # Printer
 printer_port = "COM4"
 
+# Manual text source: rows = cells (row-major), cols = lines.
+# Must be written BEFORE [[lines]] — TOML attaches trailing keys to
+# the most recent table.
+manual = [
+  ["", ""],
+  ["", ""],
+  ["", ""],
+  ["", ""],
+]
+
 [[lines]]
 name = "Top"
 font_path = "C:/Windows/Fonts/consolab.ttf"
