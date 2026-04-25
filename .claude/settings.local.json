@@ -7,7 +7,9 @@
       "Bash(uv sync *)",
       "Bash(uv pip *)",
       "Bash(rm -f tests/_diffs/text_neg_gap_1.png)",
-      "Bash(rmdir tests/_diffs)"
+      "Bash(rmdir tests/_diffs)",
+      "Bash(md5sum tests/golden/*.png)",
+      "Read(//tmp/**)"
     ]
   }
 }

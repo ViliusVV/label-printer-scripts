@@ -2,7 +2,7 @@
 
 Run:  uv run python tests/generate_golden.py
 
-For every `tests/fixtures/<name>.toml` (with sibling `<name>.csv`),
+For every `tests/fixtures/<name>.yaml` (with sibling `<name>.csv`),
 re-renders all physical labels via the current `labels.render_labels_from_csv`
 pipeline and saves them as `tests/golden/<name>_<i>.png` (mode '1').
 
@@ -25,31 +25,31 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 GOLDEN = Path(__file__).resolve().parent / "golden"
 
 
-def render_fixture(toml_path: Path):
-    cfg = LabelConfig.from_toml(toml_path)
-    csv = csv_path_for(toml_path)
+def render_fixture(config_path: Path):
+    cfg = LabelConfig.from_yaml(config_path)
+    csv = csv_path_for(config_path)
     return cfg, list(render_labels_from_csv(csv, cfg))
 
 
 def main() -> int:
     GOLDEN.mkdir(exist_ok=True)
-    fixtures = sorted(FIXTURES.glob("*.toml"))
+    fixtures = sorted(FIXTURES.glob("*.yaml"))
     if not fixtures:
         print(f"No fixtures in {FIXTURES}")
         return 1
 
     total = 0
-    for toml_path in fixtures:
-        cfg, images = render_fixture(toml_path)
+    for config_path in fixtures:
+        cfg, images = render_fixture(config_path)
         if not images:
-            print(f"  {toml_path.name}: no labels (csv empty?)")
+            print(f"  {config_path.name}: no labels (csv empty?)")
             continue
         for i, img in enumerate(images, 1):
-            out = GOLDEN / f"{toml_path.stem}_{i}.png"
+            out = GOLDEN / f"{config_path.stem}_{i}.png"
             img.save(out)
         total += len(images)
         print(
-            f"  {toml_path.stem}: {cfg.type} "
+            f"  {config_path.stem}: {cfg.type} "
             f"{cfg.width_dots}x{cfg.height_dots} -> {len(images)} label(s)"
         )
     print(f"Wrote {total} golden(s) to {GOLDEN}")

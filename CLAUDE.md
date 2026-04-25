@@ -7,18 +7,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Dependency management uses **uv** (`pyproject.toml` + `uv.lock`), Python 3.13+.
 
 ```bash
-uv sync                          # install runtime deps (pillow, pyserial)
+uv sync                          # install runtime deps (pillow, pyserial, pyyaml)
 uv sync --extra preview          # also install streamlit for the interactive preview
+uv sync --extra dev              # also install pytest for the parity test suite
 
-# All entry points take a config path; default is data/VIAL_TOP_default.toml.
+# All entry points take a config path; default is data/VIAL_TOP_default.yaml.
 # The CSV used at runtime is the sibling .csv of the config (e.g. data/VIAL_TOP_default.csv).
-uv run python print_labels.py [data/<name>.toml]   # render + send every row of the sibling CSV to the printer
-uv run python preview.py       [data/<name>.toml]  # one-shot render; saves preview_N.png and opens the first
+uv run python print_labels.py [data/<name>.yaml]   # render + send every row of the sibling CSV to the printer
+uv run python preview.py       [data/<name>.yaml]  # one-shot render; saves preview_N.png and opens the first
 uv run streamlit run preview_app.py                # interactive preview; picks the config from a dropdown
 uv run python main.py                              # dev sandbox (esc_hello / print_circles helpers)
+uv run pytest                                      # bitmap parity tests (tests/test_render_parity.py)
+uv run python tests/generate_golden.py             # regenerate golden PNGs (only when fixtures or renderer change intentionally)
 ```
 
-No tests or linter are configured. The printer's serial port lives inside each config file (`printer_port`, default `COM4`).
+No linter is configured. The printer's serial port lives inside each config file (`printer_port`, default `COM4`).
 
 ## Architecture
 
@@ -29,7 +32,7 @@ Two layers that stay deliberately decoupled:
 
 All entry points compose the two by passing a PIL Image from layer 1 into `LabelPrinter.print_bitmap`.
 
-Configs and data live in `data/`. One "skeleton" = one TOML + matching CSV, named `<TYPE>_<variant>.{toml,csv}`. `csv_path_for(toml_path)` returns the sibling CSV — always pair them this way; don't hardcode either.
+Configs and data live in `data/`. One "skeleton" = one YAML + matching CSV, named `<TYPE>_<variant>.{yaml,csv}`. `csv_path_for(config_path)` returns the sibling CSV — always pair them this way; don't hardcode either.
 
 ### Printer layer (`printer.py`)
 
@@ -44,7 +47,7 @@ Quirks that must be preserved when editing:
 
 ### Rendering layer (`labels.py`)
 
-`LabelConfig` (TOML-backed via `from_toml`/`to_toml`) owns the full skeleton spec. It has four parts:
+`LabelConfig` (YAML-backed via `from_yaml`/`to_yaml`) owns the full skeleton spec. It has four parts:
 
 - **Common**: `type`, label paper (`width_mm`, `height_mm`, `dots_per_mm`), grid (`count_x`, `count_y`, `gap_mm`), `outline_px`, `printer_port`.
 - **Lines**: `lines: list[LineConfig]` — N lines placed inside every cell. Each `LineConfig` carries `name` (UI/CSV-column label; falls back to `Line N` via `line_display_name`), `font_path`, `size_px`, `bold`, `italic`, `underline`, `underline_offset_px`, `offset_x_px`, `offset_y_px`, `default_text`.
@@ -70,13 +73,13 @@ Key design rules:
 - Bold → PIL `stroke_width=1`. Italic → render text to a temp `L` image, apply affine shear (0.2), paste through a mask. Both paths funnel through `_draw_line`; see `_render_text_image`.
 - Empty cells on a line with a non-empty `default_text` render the default (with its underline, if any) — this is the blank-writing-line placeholder for vial bottom rows.
 - Fonts are cached module-level in `_font_cache` keyed by `(path, size_px)`. Call `_load_font` rather than `ImageFont.truetype` directly.
-- **TOML write order matters.** `_dump_toml` must emit root-level keys (including `manual = [...]`) **before** any `[[lines]]` table. TOML attaches trailing keys to the most recent table, so putting `manual` after `[[lines]]` silently makes it a field of the last line config — and `tomllib` will then return `data["manual"] == None`. `_toml_value` recurses into lists so nested `list[list[str]]` serialises correctly.
+- **Config I/O is YAML.** `from_yaml` uses `yaml.safe_load`; `to_yaml` uses `yaml.safe_dump(asdict(self), sort_keys=False)` so the field order in `LabelConfig` is the file's key order. There's no per-section comment any more — saved files are pure data. (Pre-YAML history note: TOML required an emitter that wrote root keys, including the `manual` matrix, before any `[[lines]]` table. YAML has no such ordering pitfall, so the hand-rolled emitter was deleted.)
 
 `render_labels_from_csv` is the shared entry point used by `print_labels.py`, `preview.py`, and the Streamlit app — changes to the CSV → bitmap pipeline must keep all three working.
 
 ### Streamlit app (`preview_app.py`)
 
-- **Config picker** lists `data/*.toml`. All widget keys are prefixed with the config's file stem (`f"{prefix}_..."`), so switching configs gives the new file a fresh widget-state namespace and its values are loaded as defaults.
+- **Config picker** lists `data/*.yaml`. All widget keys are prefixed with the config's file stem (`f"{prefix}_..."`), so switching configs gives the new file a fresh widget-state namespace and its values are loaded as defaults.
 - **Auto-persist order matters.** The TOML save is deliberately done **after** the text-source block so that `cfg.manual` has been updated from the current Manual-mode inputs before being written. Keep this order when refactoring — saving earlier will drop manual-matrix edits. CSV saves go to the sibling `.csv`; both writes use tmp + atomic rename.
 - **Dynamic lines**: a "Number of lines" input controls how many `LineConfig` editors appear; the CSV editor's column set follows suit (`line_1`, `line_2`, …). Changing line count changes the data-editor key so its schema resets cleanly.
 - **Per-line X/Y offset sliders** are bounded to ±(cell bounding box / 2), computed from the *current* sidebar values (`circle_diameter_mm` for VIAL_TOP, `text_width/height_mm` for TEXT). Saved offsets outside the new range are clamped with `_clamp(...)` before being passed to `st.slider` — otherwise Streamlit raises on an out-of-range `value=`.

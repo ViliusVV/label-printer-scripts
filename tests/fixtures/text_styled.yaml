@@ -1,0 +1,54 @@
+type: TEXT
+width_mm: 36.0
+height_mm: 30.0
+dots_per_mm: 8
+count_x: 1
+count_y: 1
+gap_mm: 0.0
+outline_px: 2
+circle_diameter_mm: 14.5
+text_width_mm: 32.0
+text_height_mm: 24.0
+printer_port: COM4
+manual: []
+lines:
+- name: Bold
+  font_path: C:/Windows/Fonts/verdanab.ttf
+  size_px: 18
+  bold: true
+  italic: false
+  underline: false
+  underline_offset_px: 0
+  offset_x_px: 0
+  offset_y_px: -36
+  default_text: ''
+- name: Italic
+  font_path: C:/Windows/Fonts/consolab.ttf
+  size_px: 16
+  bold: false
+  italic: true
+  underline: false
+  underline_offset_px: 0
+  offset_x_px: 0
+  offset_y_px: -8
+  default_text: ''
+- name: Underline
+  font_path: C:/Windows/Fonts/Candarab.ttf
+  size_px: 14
+  bold: false
+  italic: false
+  underline: true
+  underline_offset_px: 2
+  offset_x_px: 0
+  offset_y_px: 20
+  default_text: ''
+- name: BoldItalicUL
+  font_path: C:/Windows/Fonts/verdanab.ttf
+  size_px: 12
+  bold: true
+  italic: true
+  underline: true
+  underline_offset_px: 0
+  offset_x_px: 0
+  offset_y_px: 44
+  default_text: ''

@@ -31,12 +31,12 @@ DIFFS = Path(__file__).resolve().parent / "_diffs"
 
 
 def _fixture_names() -> list[str]:
-    return sorted(p.stem for p in FIXTURES.glob("*.toml"))
+    return sorted(p.stem for p in FIXTURES.glob("*.yaml"))
 
 
-def _render(toml_path: Path) -> list[Image.Image]:
-    cfg = LabelConfig.from_toml(toml_path)
-    return list(render_labels_from_csv(csv_path_for(toml_path), cfg))
+def _render(config_path: Path) -> list[Image.Image]:
+    cfg = LabelConfig.from_yaml(config_path)
+    return list(render_labels_from_csv(csv_path_for(config_path), cfg))
 
 
 def _write_diff(name: str, idx: int, live: Image.Image, ref: Image.Image) -> Path:
@@ -71,8 +71,8 @@ def _write_diff(name: str, idx: int, live: Image.Image, ref: Image.Image) -> Pat
 
 @pytest.mark.parametrize("name", _fixture_names())
 def test_render_parity(name: str) -> None:
-    toml_path = FIXTURES / f"{name}.toml"
-    images = _render(toml_path)
+    config_path = FIXTURES / f"{name}.yaml"
+    images = _render(config_path)
     assert images, f"{name}: renderer produced no labels (csv empty?)"
 
     expected_goldens = sorted(GOLDEN.glob(f"{name}_*.png"))

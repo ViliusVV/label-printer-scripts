@@ -9,16 +9,19 @@ rendered by a type-specific "skeleton" renderer. Currently two types:
 Shared pieces: the LineConfig (font / size / bold / italic / underline /
 underline_offset / default_text), cell grid geometry, and the _render_lines
 helper that stacks lines vertically centred on a cell's midpoint.
+
+Configs are YAML; one config file pairs with a sibling .csv that supplies
+per-cell text. Use `LabelConfig.from_yaml` / `to_yaml` to round-trip.
 """
 from __future__ import annotations
 
 import csv
-import tomllib
-from dataclasses import dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Iterable, Iterator
 
+import yaml
 from PIL import Image, ImageDraw, ImageFont
 
 
@@ -116,9 +119,9 @@ class LabelConfig:
         return self.count_x * self.count_y
 
     @classmethod
-    def from_toml(cls, path: str | Path) -> "LabelConfig":
-        with open(path, "rb") as f:
-            data = tomllib.load(f)
+    def from_yaml(cls, path: str | Path) -> "LabelConfig":
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
         line_fields = {f.name for f in fields(LineConfig)}
         raw_lines = data.pop("lines", []) or []
         line_cfgs = [
@@ -129,77 +132,14 @@ class LabelConfig:
         base = {k: v for k, v in data.items() if k in valid}
         return cls(**base, lines=line_cfgs)
 
-    def to_toml(self, path: str | Path) -> None:
+    def to_yaml(self, path: str | Path) -> None:
         path = Path(path)
         tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(_dump_toml(self), encoding="utf-8")
+        tmp.write_text(
+            yaml.safe_dump(asdict(self), sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
         tmp.replace(path)
-
-
-def _toml_value(v) -> str:
-    if isinstance(v, bool):
-        return "true" if v else "false"
-    if isinstance(v, (int, float)):
-        return repr(v)
-    if isinstance(v, str):
-        escaped = v.replace("\\", "\\\\").replace('"', '\\"')
-        return f'"{escaped}"'
-    if isinstance(v, list):
-        if not v:
-            return "[]"
-        return "[" + ", ".join(_toml_value(x) for x in v) + "]"
-    raise TypeError(f"Cannot serialize {type(v).__name__} to TOML")
-
-
-def _dump_toml(cfg: LabelConfig) -> str:
-    out: list[str] = [
-        "# Label skeleton configuration — auto-saved by preview_app.py.",
-        "",
-        f"type = {_toml_value(cfg.type)}",
-        "",
-        "# Label paper",
-        f"width_mm = {_toml_value(cfg.width_mm)}",
-        f"height_mm = {_toml_value(cfg.height_mm)}",
-        f"dots_per_mm = {_toml_value(cfg.dots_per_mm)}",
-        "",
-        "# Grid",
-        f"count_x = {_toml_value(cfg.count_x)}",
-        f"count_y = {_toml_value(cfg.count_y)}",
-        f"gap_mm = {_toml_value(cfg.gap_mm)}",
-        "",
-        "# Common",
-        f"outline_px = {_toml_value(cfg.outline_px)}",
-        "",
-        "# VIAL_TOP specific",
-        f"circle_diameter_mm = {_toml_value(cfg.circle_diameter_mm)}",
-        "",
-        "# TEXT specific",
-        f"text_width_mm = {_toml_value(cfg.text_width_mm)}",
-        f"text_height_mm = {_toml_value(cfg.text_height_mm)}",
-        "",
-        "# Printer",
-        f"printer_port = {_toml_value(cfg.printer_port)}",
-        "",
-        "# Manual text source: rows = cells (row-major), cols = lines.",
-        "# Must be written BEFORE [[lines]] — TOML attaches trailing keys to",
-        "# the most recent table.",
-    ]
-    if cfg.manual:
-        out.append("manual = [")
-        for row in cfg.manual:
-            out.append(f"  {_toml_value(list(row))},")
-        out.append("]")
-    else:
-        out.append("manual = []")
-
-    line_keys = [f.name for f in fields(LineConfig)]
-    for lc in cfg.lines:
-        out.append("")
-        out.append("[[lines]]")
-        for k in line_keys:
-            out.append(f"{k} = {_toml_value(getattr(lc, k))}")
-    out.append("")
-    return "\n".join(out)
 
 
 # ---------------------------- Font loading ----------------------------
@@ -416,5 +356,5 @@ def render_labels_from_csv(
 
 
 def csv_path_for(config_path: str | Path) -> Path:
-    """Sibling .csv of a given .toml config path."""
+    """Sibling .csv of a given config path (regardless of config extension)."""
     return Path(config_path).with_suffix(".csv")

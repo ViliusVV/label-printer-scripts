@@ -1,6 +1,6 @@
 """Read the CSV associated with a config and print every physical label.
 
-Run:  python print_labels.py [data/VIAL_TOP_default.toml]
+Run:  python print_labels.py [data/VIAL_TOP_default.yaml]
 """
 import argparse
 from pathlib import Path
@@ -10,7 +10,7 @@ from printer import HAlign, LabelPrinter, VAlign
 
 
 def main(config_path: Path):
-    cfg = LabelConfig.from_toml(config_path)
+    cfg = LabelConfig.from_yaml(config_path)
     csv_path = csv_path_for(config_path)
     images = list(render_labels_from_csv(csv_path, cfg))
 
@@ -31,8 +31,8 @@ def main(config_path: Path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "config", nargs="?", default="data/VIAL_TOP_default.toml",
-        type=Path, help="Path to a TOML config; sibling .csv supplies data.",
+        "config", nargs="?", default="data/VIAL_TOP_default.yaml",
+        type=Path, help="Path to a YAML config; sibling .csv supplies data.",
     )
     args = parser.parse_args()
     main(args.config)

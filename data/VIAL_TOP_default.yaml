@@ -1,0 +1,50 @@
+type: VIAL_TOP
+width_mm: 36.0
+height_mm: 30.0
+dots_per_mm: 8
+count_x: 2
+count_y: 1
+gap_mm: 0.0
+outline_px: 1
+circle_diameter_mm: 14.5
+text_width_mm: 36.0
+text_height_mm: 30.0
+printer_port: COM4
+manual:
+- - Zener
+  - 10V
+  - ''
+- - Schotky
+  - 1N60
+  - ''
+lines:
+- name: TopLine
+  font_path: C:/Windows/Fonts/consolab.ttf
+  size_px: 20
+  bold: false
+  italic: false
+  underline: true
+  underline_offset_px: 0
+  offset_x_px: 0
+  offset_y_px: -39
+  default_text: ''
+- name: MiddleLine
+  font_path: C:/Windows/Fonts/consolab.ttf
+  size_px: 30
+  bold: false
+  italic: false
+  underline: false
+  underline_offset_px: 0
+  offset_x_px: 0
+  offset_y_px: 0
+  default_text: '       '
+- name: BottomLine
+  font_path: C:/Windows/Fonts/verdanab.ttf
+  size_px: 28
+  bold: false
+  italic: false
+  underline: true
+  underline_offset_px: 0
+  offset_x_px: 0
+  offset_y_px: 26
+  default_text: '      '

@@ -2,7 +2,7 @@
 
 Config files live in `data/`. Pick one in the sidebar; every widget
 auto-saves to it. Changes to the CSV editor auto-save the sibling .csv.
-Use the same config via `python print_labels.py data/<name>.toml`
+Use the same config via `python print_labels.py data/<name>.yaml`
 to print exactly what you see.
 
 Run:  uv run streamlit run preview_app.py
@@ -103,16 +103,16 @@ def _font_selectbox(label: str, current_path: str, key: str) -> str:
 # --- Config file picker -------------------------------------------------------
 
 DATA_DIR.mkdir(exist_ok=True)
-config_files = sorted(p.name for p in DATA_DIR.glob("*.toml"))
+config_files = sorted(p.name for p in DATA_DIR.glob("*.yaml"))
 if not config_files:
-    st.error(f"No .toml configs in {DATA_DIR}/")
+    st.error(f"No .yaml configs in {DATA_DIR}/")
     st.stop()
 
 with st.sidebar.expander("Config file", expanded=True):
     selected_name = st.selectbox(
         "File", config_files,
-        index=0 if "VIAL_TOP_default.toml" not in config_files
-        else config_files.index("VIAL_TOP_default.toml"),
+        index=0 if "VIAL_TOP_default.yaml" not in config_files
+        else config_files.index("VIAL_TOP_default.yaml"),
         key="config_file",
     )
 
@@ -123,7 +123,7 @@ prefix = CONFIG_PATH.stem  # widget keys are prefixed so switching files loads d
 # Re-read initial config every rerun. Widgets with session-state values win;
 # fresh widgets (after file switch -> new prefix) see the new defaults.
 try:
-    initial = LabelConfig.from_toml(CONFIG_PATH)
+    initial = LabelConfig.from_yaml(CONFIG_PATH)
 except Exception as e:
     st.error(f"Failed to load {CONFIG_PATH}: {e}")
     st.stop()
@@ -389,7 +389,7 @@ else:
 # Auto-save. Done here (after the manual matrix is captured into cfg.manual)
 # so Manual-mode edits survive the rerun.
 try:
-    cfg.to_toml(CONFIG_PATH)
+    cfg.to_yaml(CONFIG_PATH)
     st.sidebar.caption(f"Auto-saved to {CONFIG_PATH}")
 except OSError as e:
     st.sidebar.error(f"Couldn't save {CONFIG_PATH.name}: {e}")
