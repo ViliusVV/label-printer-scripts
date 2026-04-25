@@ -128,6 +128,11 @@ except Exception as e:
     st.error(f"Failed to load {CONFIG_PATH}: {e}")
     st.stop()
 
+with st.sidebar.expander("Printer", expanded=False):
+    printer_port = st.text_input(
+        "Serial port", value=initial.printer_port, key=f"{prefix}_printer_port"
+    )
+
 
 # --- Sidebar: label + grid + type-specific -----------------------------------
 
@@ -197,11 +202,6 @@ else:
     circle_diameter_mm = initial.circle_diameter_mm
     text_width_mm = initial.text_width_mm
     text_height_mm = initial.text_height_mm
-
-with st.sidebar.expander("Printer", expanded=False):
-    printer_port = st.text_input(
-        "Serial port", value=initial.printer_port, key=f"{prefix}_printer_port"
-    )
 
 
 # --- Sidebar: lines -----------------------------------------------------------
@@ -397,7 +397,7 @@ except OSError as e:
 
 # --- Render + per-label actions ----------------------------------------------
 
-scale = st.slider("Display scale", 1, 12, 6, key="scale")
+scale = st.slider("Display scale", 1, 4, 2, key="scale")
 
 st.caption(
     f"{cfg.type} · {cfg.width_dots}×{cfg.height_dots} dots "
