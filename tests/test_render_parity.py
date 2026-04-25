@@ -12,18 +12,15 @@ when refactoring the rendering path.
 On mismatch the test writes a 3-panel diff (golden | live | red overlay)
 to `tests/_diffs/` so the failure is debuggable without re-running.
 """
+
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
 from PIL import Image, ImageChops
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-
-from labels import LabelConfig, csv_path_for, render_labels_from_csv  # noqa: E402
+from label_printer import LabelConfig, csv_path_for, render_labels_from_csv
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 GOLDEN = Path(__file__).resolve().parent / "golden"
@@ -93,6 +90,5 @@ def test_render_parity(name: str) -> None:
         if live.tobytes() != ref.tobytes():
             diff_path = _write_diff(name, i, live, ref)
             pytest.fail(
-                f"{name}#{i}: pixel mismatch vs {golden_path.name}; "
-                f"diff written to {diff_path}"
+                f"{name}#{i}: pixel mismatch vs {golden_path.name}; diff written to {diff_path}"
             )

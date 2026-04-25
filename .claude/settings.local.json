@@ -9,7 +9,9 @@
       "Bash(rm -f tests/_diffs/text_neg_gap_1.png)",
       "Bash(rmdir tests/_diffs)",
       "Bash(md5sum tests/golden/*.png)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(git mv *)",
+      "Bash(git rm *)"
     ]
   }
 }

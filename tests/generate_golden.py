@@ -3,7 +3,7 @@
 Run:  uv run python tests/generate_golden.py
 
 For every `tests/fixtures/<name>.yaml` (with sibling `<name>.csv`),
-re-renders all physical labels via the current `labels.render_labels_from_csv`
+re-renders all physical labels via the current `render_labels_from_csv`
 pipeline and saves them as `tests/golden/<name>_<i>.png` (mode '1').
 
 The committed goldens are the parity baseline: the test harness
@@ -11,15 +11,16 @@ The committed goldens are the parity baseline: the test harness
 so re-run this script ONLY when fixtures change or the renderer's
 output is intentionally being updated — never to "make tests pass".
 """
+
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 
-from labels import LabelConfig, csv_path_for, render_labels_from_csv  # noqa: E402
+from label_printer import LabelConfig, csv_path_for, render_labels_from_csv  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 GOLDEN = Path(__file__).resolve().parent / "golden"

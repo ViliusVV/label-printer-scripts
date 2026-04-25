@@ -1,7 +1,7 @@
 [project]
 name = "label-printer"
 version = "0.1.0"
-description = "Add your description here"
+description = "Render and ESC/POS-print labels for the TF P2 thermal label printer."
 requires-python = ">=3.13"
 dependencies = [
     "pandas>=3.0.2",
@@ -12,25 +12,45 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
 
 [project.scripts]
-print_ui = "print_ui:main"
+label-printer = "label_printer.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-# Flat-layout modules that ship in the wheel. preview.py / print_labels.py /
-# main.py are run as scripts via `uv run python <file>`, not imported, so
-# they don't need to be packaged.
-include = [
-    "labels.py",
-    "printer.py",
-    "preview_app.py",
-    "print_ui.py",
-]
+packages = ["src/label_printer"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pycodestyle + pyflakes
+    "I",             # isort
+    "UP",            # pyupgrade
+    "B",             # flake8-bugbear
+    "SIM",           # flake8-simplify
+    "RUF",           # ruff-specific
+]
+ignore = [
+    "E501",     # long lines: not enforced (we read off-screen)
+    "B008",     # function calls in argument defaults: needed for argparse defaults
+    "RUF001",   # ambiguous Unicode in strings: × is intentional (UI captions)
+    "RUF002",   # ambiguous Unicode in docstrings: × is intentional (geometry)
+    "RUF003",   # ambiguous Unicode in comments: × is intentional (geometry)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/label_printer/app/main.py" = ["E402"]  # streamlit imports run on import
