@@ -9,17 +9,17 @@ outline_px: 1
 lines:
 - name: TopLine
   font_path: C:/Windows/Fonts/consolab.ttf
-  size_px: 18
+  size_px: 17
   bold: false
   italic: false
   underline: true
   underline_offset_px: -1
   offset_x_px: 0
-  offset_y_px: -30
+  offset_y_px: -29
   default_text: ''
 - name: MiddleLine
   font_path: C:/Windows/Fonts/GOTHICB.TTF
-  size_px: 38
+  size_px: 28
   bold: false
   italic: false
   underline: false
@@ -29,13 +29,13 @@ lines:
   default_text: '       '
 - name: BottomLine
   font_path: C:/Windows/Fonts/verdanab.ttf
-  size_px: 16
+  size_px: 13
   bold: false
   italic: false
   underline: true
   underline_offset_px: 0
   offset_x_px: 0
-  offset_y_px: 26
+  offset_y_px: 24
   default_text: '      '
 circle_diameter_mm: 14.5
 text_width_mm: 36.0
