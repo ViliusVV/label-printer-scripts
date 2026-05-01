@@ -181,10 +181,17 @@ def _draw_line(img, draw, xy, text: str, lc: LineConfig, font):
 
     has_glyph = bool(effective.strip())
     text_w: int | None = None
+    needs_temp_image = lc.bold or lc.italic or lc.letter_spacing_px != 0
 
     if has_glyph:
-        if lc.bold or lc.italic:
-            temp = _render_text_image(effective, font, bold=lc.bold, italic=lc.italic)
+        if needs_temp_image:
+            temp = _render_text_image(
+                effective,
+                font,
+                bold=lc.bold,
+                italic=lc.italic,
+                letter_spacing_px=lc.letter_spacing_px,
+            )
             mask = temp.point(lambda p: 255 if p < 128 else 0, mode="L")
             text_w, text_h = temp.size
             x0 = round(cx - text_w / 2)
@@ -207,21 +214,53 @@ def _render_text_image(
     bold: bool = False,
     italic: bool = False,
     shear: float = 0.2,
+    letter_spacing_px: int = 0,
 ) -> Image.Image:
     stroke = 1 if bold else 0
-    left, top, right, bottom = font.getbbox(text, stroke_width=stroke)
-    pad = 2
-    w = (right - left) + pad * 2
-    h = (bottom - top) + pad * 2
-    img = Image.new("L", (w, h), 255)
-    ImageDraw.Draw(img).text(
-        (-left + pad, -top + pad),
-        text,
-        fill=0,
-        font=font,
-        stroke_width=stroke,
-        stroke_fill=0,
-    )
+    if letter_spacing_px == 0:
+        # Fast path: a single draw call. Byte-identical to the pre-tracking
+        # output so existing golden bitmaps still match.
+        left, top, right, bottom = font.getbbox(text, stroke_width=stroke)
+        pad = 2
+        w = (right - left) + pad * 2
+        h = (bottom - top) + pad * 2
+        img = Image.new("L", (w, h), 255)
+        ImageDraw.Draw(img).text(
+            (-left + pad, -top + pad),
+            text,
+            fill=0,
+            font=font,
+            stroke_width=stroke,
+            stroke_fill=0,
+        )
+    else:
+        # Per-character layout: lay each glyph by its natural advance and add
+        # the requested spacing between them. Vertical extent uses the full
+        # text bbox so ascender/descender baselines line up across chars.
+        chars = list(text)
+        _, top, _, bottom = font.getbbox(text, stroke_width=stroke)
+        char_advances = [font.getlength(c) for c in chars]
+        n = len(chars)
+        total_advance = sum(char_advances) + letter_spacing_px * max(0, n - 1)
+        # Padding generous enough to absorb glyph side-bearings and any
+        # negative-spacing overshoot at typical sizes.
+        pad = 8
+        w = max(1, round(total_advance)) + pad * 2
+        h = (bottom - top) + pad * 2
+        img = Image.new("L", (w, h), 255)
+        d = ImageDraw.Draw(img)
+        x = float(pad)
+        y = pad - top
+        for c, adv in zip(chars, char_advances, strict=False):
+            d.text(
+                (x, y),
+                c,
+                fill=0,
+                font=font,
+                stroke_width=stroke,
+                stroke_fill=0,
+            )
+            x += adv + letter_spacing_px
     if italic:
         extra = int(h * shear) + 1
         img = img.transform(

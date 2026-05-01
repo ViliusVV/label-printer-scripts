@@ -391,6 +391,15 @@ def _line_controls(
             value=int(defaults.underline_offset_px),
             key=f"{k}_ul_offset",
         )
+        letter_spacing_px = st.slider(
+            "Letter spacing (px, 0 = normal)",
+            -5,
+            30,
+            value=_clamp(int(defaults.letter_spacing_px), -5, 30),
+            key=f"{k}_letter_spacing",
+            help="Extra horizontal space between glyphs. Negative compacts; "
+            "positive extends. Negative values quickly make text overlap.",
+        )
         x_max = max(1, cell_w_dots // 2)
         y_max = max(1, cell_h_dots // 2)
         offset_x_px = st.slider(
@@ -420,6 +429,7 @@ def _line_controls(
         italic=italic,
         underline=underline,
         underline_offset_px=int(underline_offset_px),
+        letter_spacing_px=int(letter_spacing_px),
         offset_x_px=int(offset_x_px),
         offset_y_px=int(offset_y_px),
         default_text=default_text,

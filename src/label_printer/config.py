@@ -31,6 +31,10 @@ class LineConfig:
     italic: bool = False
     underline: bool = False
     underline_offset_px: int = 0
+    # Extra horizontal space inserted between glyphs, in pixels.
+    # 0 = font's natural advance (default). Positive = looser tracking;
+    # negative = tighter (chars eventually overlap).
+    letter_spacing_px: int = 0
     # Position relative to the cell's centre. (0, 0) = dead centre;
     # negative Y = above centre, positive = below.
     offset_x_px: int = 0
