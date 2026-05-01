@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 
 class SkeletonType(StrEnum):
     VIAL_TOP = "VIAL_TOP"
+    VIAL_TOP_OCTA = "VIAL_TOP_OCTA"
     TEXT = "TEXT"
 
 
@@ -65,6 +66,15 @@ class LabelConfig:
     # VIAL_TOP-specific
     circle_diameter_mm: float = 14.5
 
+    # VIAL_TOP_OCTA-specific (irregular octagon — bounding box plus the lengths
+    # of the top/bottom (horizontal) and left/right (vertical) straight segments;
+    # the four corner cuts have widths (width-h_seg)/2 and (height-v_seg)/2 and
+    # don't have to be 45°). Constraints: 0 <= h_seg <= width, 0 <= v_seg <= height.
+    octa_width_mm: float = 14.5
+    octa_height_mm: float = 14.5
+    octa_horizontal_segment_mm: float = 6.0
+    octa_vertical_segment_mm: float = 6.0
+
     # TEXT-specific
     text_width_mm: float = 36.0
     text_height_mm: float = 30.0
@@ -93,6 +103,22 @@ class LabelConfig:
     @property
     def circle_diameter_dots(self) -> int:
         return round(self.circle_diameter_mm * self.dots_per_mm)
+
+    @property
+    def octa_width_dots(self) -> int:
+        return round(self.octa_width_mm * self.dots_per_mm)
+
+    @property
+    def octa_height_dots(self) -> int:
+        return round(self.octa_height_mm * self.dots_per_mm)
+
+    @property
+    def octa_horizontal_segment_dots(self) -> int:
+        return round(self.octa_horizontal_segment_mm * self.dots_per_mm)
+
+    @property
+    def octa_vertical_segment_dots(self) -> int:
+        return round(self.octa_vertical_segment_mm * self.dots_per_mm)
 
     @property
     def text_width_dots(self) -> int:

@@ -72,6 +72,8 @@ def _cell_box_dots(cfg: LabelConfig) -> tuple[int, int]:
     if cfg.type == SkeletonType.VIAL_TOP.value:
         d = cfg.circle_diameter_dots
         return d, d
+    if cfg.type == SkeletonType.VIAL_TOP_OCTA.value:
+        return cfg.octa_width_dots, cfg.octa_height_dots
     if cfg.type == SkeletonType.TEXT.value:
         return cfg.text_width_dots, cfg.text_height_dots
     raise ValueError(f"Unknown skeleton type: {cfg.type!r}")
@@ -102,8 +104,39 @@ def _render_text(img, draw, center, cell_dims, cell_lines, cfg: LabelConfig):
     _render_lines(img, draw, (cx, cy), cell_lines, cfg.lines)
 
 
+def _render_vial_top_octa(img, draw, center, cell_dims, cell_lines, cfg: LabelConfig):
+    cx, cy = center
+    cell_w, cell_h = cell_dims
+    # Match the rectangle's pixel-art convention: bbox spans
+    # [cx - cell_w/2, cx + cell_w/2 - 1] × [cy - cell_h/2, cy + cell_h/2 - 1].
+    left = cx - cell_w / 2
+    right = cx + cell_w / 2 - 1
+    top = cy - cell_h / 2
+    bottom = cy + cell_h / 2 - 1
+    mid_x = (left + right) / 2
+    mid_y = (top + bottom) / 2
+    # Clamp segments to bbox so a misconfigured config still renders sensibly
+    # rather than producing self-intersecting vertices.
+    h_half = min(cfg.octa_horizontal_segment_dots, cell_w) / 2
+    v_half = min(cfg.octa_vertical_segment_dots, cell_h) / 2
+    if cfg.outline_px > 0:
+        verts = [
+            (mid_x - h_half, top),
+            (mid_x + h_half, top),
+            (right, mid_y - v_half),
+            (right, mid_y + v_half),
+            (mid_x + h_half, bottom),
+            (mid_x - h_half, bottom),
+            (left, mid_y + v_half),
+            (left, mid_y - v_half),
+        ]
+        draw.polygon(verts, outline=0, width=cfg.outline_px)
+    _render_lines(img, draw, (cx, cy), cell_lines, cfg.lines)
+
+
 _CELL_RENDERERS: dict[str, Callable] = {
     SkeletonType.VIAL_TOP.value: _render_vial_top,
+    SkeletonType.VIAL_TOP_OCTA.value: _render_vial_top_octa,
     SkeletonType.TEXT.value: _render_text,
 }
 

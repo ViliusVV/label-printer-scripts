@@ -15,7 +15,8 @@ import streamlit.components.v1 as components
 
 from label_printer.app.sidebar import render_sidebar
 from label_printer.app.text_source import render_text_source
-from label_printer.config import LabelConfig, csv_path_for
+from label_printer.config import LabelConfig, SkeletonType, csv_path_for
+from label_printer.csv_io import save_csv
 from label_printer.printer import HAlign, VAlign, print_image_with_config
 from label_printer.render import render_label
 
@@ -54,20 +55,68 @@ def main() -> None:
 def _config_picker() -> tuple[Path, str]:
     DATA_DIR.mkdir(exist_ok=True)
     config_files = sorted(p.name for p in DATA_DIR.glob("*.yaml"))
-    if not config_files:
-        st.error(f"No .yaml configs in {DATA_DIR}/")
-        st.stop()
 
     with st.sidebar.expander("Config file", expanded=True):
-        default_idx = config_files.index(DEFAULT_CONFIG) if DEFAULT_CONFIG in config_files else 0
-        selected_name = st.selectbox(
-            "File",
-            config_files,
-            index=default_idx,
-            key="config_file",
-        )
+        if config_files:
+            default_idx = (
+                config_files.index(DEFAULT_CONFIG) if DEFAULT_CONFIG in config_files else 0
+            )
+            selected_name = st.selectbox(
+                "File",
+                config_files,
+                index=default_idx,
+                key="config_file",
+            )
+        else:
+            selected_name = None
+            st.caption(f"No .yaml configs in {DATA_DIR}/ — create one below.")
+        if st.button("➕ New config", key="new_config_btn", use_container_width=True):
+            _new_config_dialog()
+
+    if selected_name is None:
+        st.stop()
     config_path = DATA_DIR / selected_name
     return config_path, config_path.stem
+
+
+@st.dialog("Create new config")
+def _new_config_dialog() -> None:
+    name = st.text_input(
+        "Config name",
+        key="new_config_name",
+        help="File stem; '.yaml' is added automatically.",
+    )
+    type_options = [t.value for t in SkeletonType]
+    skeleton_type = st.selectbox(
+        "Skeleton type",
+        type_options,
+        key="new_config_type",
+    )
+    c_create, c_cancel = st.columns(2)
+    if c_create.button("Create", type="primary", use_container_width=True):
+        clean = (name or "").strip()
+        if not clean:
+            st.error("Name cannot be empty.")
+            return
+        if any(sep in clean for sep in ("/", "\\")) or clean.startswith("."):
+            st.error("Name must not contain path separators or start with a dot.")
+            return
+        new_path = DATA_DIR / f"{clean}.yaml"
+        if new_path.exists():
+            st.error(f"{new_path.name} already exists.")
+            return
+        try:
+            LabelConfig(type=skeleton_type).to_yaml(new_path)
+            save_csv(csv_path_for(new_path), [], n_columns=1)
+        except OSError as e:
+            st.error(f"Could not create files: {e}")
+            return
+        # Pre-select the new file on the next run; the selectbox keyed
+        # 'config_file' will pick this up before its own index= takes effect.
+        st.session_state["config_file"] = new_path.name
+        st.rerun()
+    if c_cancel.button("Cancel", use_container_width=True):
+        st.rerun()
 
 
 def _load_config_or_stop(config_path: Path) -> LabelConfig:

@@ -7,6 +7,7 @@ with the config's file stem so switching configs reloads its defaults.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import streamlit as st
@@ -22,8 +23,29 @@ def _clamp(v: int, lo: int, hi: int) -> int:
 @dataclass
 class TypeSpecific:
     circle_diameter_mm: float
+    octa_width_mm: float
+    octa_height_mm: float
+    octa_horizontal_segment_mm: float
+    octa_vertical_segment_mm: float
     text_width_mm: float
     text_height_mm: float
+
+
+def _carry(initial: LabelConfig, **overrides: float) -> TypeSpecific:
+    """TypeSpecific that defaults every field to `initial`'s value, overriding
+    only the active type's edited values. Inactive types' fields round-trip
+    through the YAML untouched."""
+    base = {
+        "circle_diameter_mm": initial.circle_diameter_mm,
+        "octa_width_mm": initial.octa_width_mm,
+        "octa_height_mm": initial.octa_height_mm,
+        "octa_horizontal_segment_mm": initial.octa_horizontal_segment_mm,
+        "octa_vertical_segment_mm": initial.octa_vertical_segment_mm,
+        "text_width_mm": initial.text_width_mm,
+        "text_height_mm": initial.text_height_mm,
+    }
+    base.update(overrides)
+    return TypeSpecific(**base)
 
 
 def render_sidebar(initial: LabelConfig, prefix: str) -> LabelConfig:
@@ -33,11 +55,10 @@ def render_sidebar(initial: LabelConfig, prefix: str) -> LabelConfig:
     after the text-source block has run.
     """
     printer_port = _printer_section(initial, prefix)
-    cfg_type = _type_section(initial, prefix)
+    cfg_type, type_specific = _type_section(initial, prefix)
     width_mm, height_mm, dots_per_mm = _label_paper_section(initial, prefix)
     count_x, count_y, gap_mm = _grid_section(initial, prefix)
     outline_px = _styling_section(initial, prefix)
-    type_specific = _type_specific_section(initial, prefix, cfg_type)
 
     n_lines = _n_lines_input(initial, prefix)
     cell_w_dots, cell_h_dots = _cell_box_dots_for_ui(
@@ -66,6 +87,10 @@ def render_sidebar(initial: LabelConfig, prefix: str) -> LabelConfig:
         gap_mm=gap_mm,
         outline_px=outline_px,
         circle_diameter_mm=type_specific.circle_diameter_mm,
+        octa_width_mm=type_specific.octa_width_mm,
+        octa_height_mm=type_specific.octa_height_mm,
+        octa_horizontal_segment_mm=type_specific.octa_horizontal_segment_mm,
+        octa_vertical_segment_mm=type_specific.octa_vertical_segment_mm,
         text_width_mm=type_specific.text_width_mm,
         text_height_mm=type_specific.text_height_mm,
         printer_port=printer_port,
@@ -83,16 +108,49 @@ def _printer_section(initial: LabelConfig, prefix: str) -> str:
         )
 
 
-def _type_section(initial: LabelConfig, prefix: str) -> str:
+def _type_section(initial: LabelConfig, prefix: str) -> tuple[str, TypeSpecific]:
     with st.sidebar.expander("Type & layout", expanded=True):
         type_options = [t.value for t in SkeletonType]
         type_idx = type_options.index(initial.type) if initial.type in type_options else 0
-        return st.selectbox(
+        cfg_type = st.selectbox(
             "Skeleton type",
             type_options,
             index=type_idx,
             key=f"{prefix}_type",
         )
+        type_specific = _type_specific_inputs(initial, prefix, cfg_type)
+        _computed_values(cfg_type, type_specific)
+    return cfg_type, type_specific
+
+
+def _computed_values(cfg_type: str, ts: TypeSpecific) -> None:
+    """Read-only summary derived from the type-specific inputs."""
+    st.divider()
+    st.caption("Computed")
+    if cfg_type == SkeletonType.VIAL_TOP.value:
+        area_cm2 = math.pi * (ts.circle_diameter_mm / 2) ** 2 / 100
+        st.markdown(f"- Area: **{area_cm2:.2f} cm²**")
+        return
+    if cfg_type == SkeletonType.VIAL_TOP_OCTA.value:
+        # Body diagonals between opposite vertices. There are 8 vertices, but
+        # they pair into two distinct spans: top↔bottom corners of the
+        # horizontal edges, and left↔right corners of the vertical edges.
+        cut_w = (ts.octa_width_mm - ts.octa_horizontal_segment_mm) / 2
+        cut_h = (ts.octa_height_mm - ts.octa_vertical_segment_mm) / 2
+        slanted_mm = math.hypot(cut_w, cut_h)
+        diag_v_mm = math.hypot(ts.octa_horizontal_segment_mm, ts.octa_height_mm)
+        diag_h_mm = math.hypot(ts.octa_width_mm, ts.octa_vertical_segment_mm)
+        area_cm2 = (ts.octa_width_mm * ts.octa_height_mm - 2 * cut_w * cut_h) / 100
+        st.markdown(f"- Slanted edge: **{slanted_mm:.2f} mm**")
+        st.markdown(f"- Top↔bottom diagonal: **{diag_v_mm:.2f} mm**")
+        st.markdown(f"- Left↔right diagonal: **{diag_h_mm:.2f} mm**")
+        st.markdown(f"- Area: **{area_cm2:.2f} cm²**")
+        return
+    if cfg_type == SkeletonType.TEXT.value:
+        diag_mm = math.hypot(ts.text_width_mm, ts.text_height_mm)
+        area_cm2 = ts.text_width_mm * ts.text_height_mm / 100
+        st.markdown(f"- Diagonal: **{diag_mm:.2f} mm**")
+        st.markdown(f"- Area: **{area_cm2:.2f} cm²**")
 
 
 def _label_paper_section(initial: LabelConfig, prefix: str) -> tuple[float, float, int]:
@@ -162,55 +220,101 @@ def _styling_section(initial: LabelConfig, prefix: str) -> int:
     return int(outline_px)
 
 
-def _type_specific_section(
+def _type_specific_inputs(
     initial: LabelConfig,
     prefix: str,
     cfg_type: str,
 ) -> TypeSpecific:
-    """Show type-specific knobs; preserve fields for the inactive type."""
+    """Render type-specific knobs inline (caller owns the container).
+
+    Inactive types' fields are carried through unchanged so switching types
+    later doesn't lose their values.
+    """
     if cfg_type == SkeletonType.VIAL_TOP.value:
-        with st.sidebar.expander("VIAL_TOP", expanded=False):
-            circle_diameter_mm = st.number_input(
-                "Circle diameter (mm)",
-                1.0,
-                50.0,
-                value=float(initial.circle_diameter_mm),
-                step=0.5,
-                key=f"{prefix}_circle_diameter_mm",
-            )
-        return TypeSpecific(
-            circle_diameter_mm=circle_diameter_mm,
-            text_width_mm=initial.text_width_mm,
-            text_height_mm=initial.text_height_mm,
+        circle_diameter_mm = st.number_input(
+            "Circle diameter (mm)",
+            1.0,
+            50.0,
+            value=float(initial.circle_diameter_mm),
+            step=0.5,
+            key=f"{prefix}_circle_diameter_mm",
+        )
+        return _carry(initial, circle_diameter_mm=circle_diameter_mm)
+    if cfg_type == SkeletonType.VIAL_TOP_OCTA.value:
+        octa_width_mm = st.number_input(
+            "Bounding box width (mm)",
+            1.0,
+            50.0,
+            value=float(initial.octa_width_mm),
+            step=0.5,
+            key=f"{prefix}_octa_width_mm",
+        )
+        octa_height_mm = st.number_input(
+            "Bounding box height (mm)",
+            1.0,
+            50.0,
+            value=float(initial.octa_height_mm),
+            step=0.5,
+            key=f"{prefix}_octa_height_mm",
+        )
+        # Auto-clamp segments to the current bbox so adjacent diagonals
+        # never cross. Adjusting session state before the widget renders
+        # avoids Streamlit's "value out of [min,max] range" error when the
+        # user shrinks a dimension below a previously-stored segment.
+        h_seg_key = f"{prefix}_octa_horizontal_segment_mm"
+        v_seg_key = f"{prefix}_octa_vertical_segment_mm"
+        if h_seg_key in st.session_state and st.session_state[h_seg_key] > octa_width_mm:
+            st.session_state[h_seg_key] = octa_width_mm
+        if v_seg_key in st.session_state and st.session_state[v_seg_key] > octa_height_mm:
+            st.session_state[v_seg_key] = octa_height_mm
+        octa_horizontal_segment_mm = st.number_input(
+            "Horizontal segment length (mm)",
+            0.0,
+            float(octa_width_mm),
+            value=min(float(initial.octa_horizontal_segment_mm), float(octa_width_mm)),
+            step=0.5,
+            key=h_seg_key,
+            help="Length of the top/bottom straight edges. Must be ≤ bounding box width.",
+        )
+        octa_vertical_segment_mm = st.number_input(
+            "Vertical segment length (mm)",
+            0.0,
+            float(octa_height_mm),
+            value=min(float(initial.octa_vertical_segment_mm), float(octa_height_mm)),
+            step=0.5,
+            key=v_seg_key,
+            help="Length of the left/right straight edges. Must be ≤ bounding box height.",
+        )
+        return _carry(
+            initial,
+            octa_width_mm=octa_width_mm,
+            octa_height_mm=octa_height_mm,
+            octa_horizontal_segment_mm=octa_horizontal_segment_mm,
+            octa_vertical_segment_mm=octa_vertical_segment_mm,
         )
     if cfg_type == SkeletonType.TEXT.value:
-        with st.sidebar.expander("TEXT", expanded=False):
-            text_width_mm = st.number_input(
-                "Text box width (mm)",
-                1.0,
-                100.0,
-                value=float(initial.text_width_mm),
-                step=0.5,
-                key=f"{prefix}_text_width_mm",
-            )
-            text_height_mm = st.number_input(
-                "Text box height (mm)",
-                1.0,
-                100.0,
-                value=float(initial.text_height_mm),
-                step=0.5,
-                key=f"{prefix}_text_height_mm",
-            )
-        return TypeSpecific(
-            circle_diameter_mm=initial.circle_diameter_mm,
+        text_width_mm = st.number_input(
+            "Text box width (mm)",
+            1.0,
+            100.0,
+            value=float(initial.text_width_mm),
+            step=0.5,
+            key=f"{prefix}_text_width_mm",
+        )
+        text_height_mm = st.number_input(
+            "Text box height (mm)",
+            1.0,
+            100.0,
+            value=float(initial.text_height_mm),
+            step=0.5,
+            key=f"{prefix}_text_height_mm",
+        )
+        return _carry(
+            initial,
             text_width_mm=text_width_mm,
             text_height_mm=text_height_mm,
         )
-    return TypeSpecific(
-        circle_diameter_mm=initial.circle_diameter_mm,
-        text_width_mm=initial.text_width_mm,
-        text_height_mm=initial.text_height_mm,
-    )
+    return _carry(initial)
 
 
 def _n_lines_input(initial: LabelConfig, prefix: str) -> int:
@@ -235,6 +339,11 @@ def _cell_box_dots_for_ui(
     if cfg_type == SkeletonType.VIAL_TOP.value:
         d = round(ts.circle_diameter_mm * dots_per_mm)
         return d, d
+    if cfg_type == SkeletonType.VIAL_TOP_OCTA.value:
+        return (
+            round(ts.octa_width_mm * dots_per_mm),
+            round(ts.octa_height_mm * dots_per_mm),
+        )
     if cfg_type == SkeletonType.TEXT.value:
         return (
             round(ts.text_width_mm * dots_per_mm),
