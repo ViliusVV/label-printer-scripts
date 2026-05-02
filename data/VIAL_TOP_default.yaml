@@ -47,7 +47,7 @@ octa_horizontal_segment_mm: 6.0
 octa_vertical_segment_mm: 6.0
 text_width_mm: 36.0
 text_height_mm: 30.0
-printer_port: COM4
+printer_port: COM7
 head_alignment: center
 manual:
 - - Zener

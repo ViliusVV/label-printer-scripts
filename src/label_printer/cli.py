@@ -97,6 +97,7 @@ def cmd_print(config_path: Path) -> int:
         cfg.printer_port,
         label_width_mm=cfg.width_mm,
         label_height_mm=cfg.height_mm,
+        head_alignment=cfg.head_alignment,
     ) as printer:
         for i, img in enumerate(images, 1):
             log.info(

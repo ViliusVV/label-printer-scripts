@@ -13,7 +13,13 @@ from dataclasses import dataclass
 import streamlit as st
 
 from label_printer.app.fonts import font_selectbox
-from label_printer.config import LabelConfig, LineConfig, SkeletonType, line_display_name
+from label_printer.config import (
+    HeadAlignment,
+    LabelConfig,
+    LineConfig,
+    SkeletonType,
+    line_display_name,
+)
 
 
 def _clamp(v: int, lo: int, hi: int) -> int:
@@ -54,7 +60,7 @@ def render_sidebar(initial: LabelConfig, prefix: str) -> LabelConfig:
     `cfg.manual` is carried through from `initial`; the caller overwrites it
     after the text-source block has run.
     """
-    printer_port = _printer_section(initial, prefix)
+    printer_port, head_alignment = _printer_section(initial, prefix)
     cfg_type, type_specific = _type_section(initial, prefix)
     width_mm, height_mm, dots_per_mm = _label_paper_section(initial, prefix)
     count_x, count_y, gap_mm = _grid_section(initial, prefix)
@@ -94,18 +100,34 @@ def render_sidebar(initial: LabelConfig, prefix: str) -> LabelConfig:
         text_width_mm=type_specific.text_width_mm,
         text_height_mm=type_specific.text_height_mm,
         printer_port=printer_port,
+        head_alignment=head_alignment,
         lines=lines,
         manual=initial.manual,
     )
 
 
-def _printer_section(initial: LabelConfig, prefix: str) -> str:
+def _printer_section(initial: LabelConfig, prefix: str) -> tuple[str, str]:
     with st.sidebar.expander("Printer", expanded=False):
-        return st.text_input(
+        port = st.text_input(
             "Serial port",
             value=initial.printer_port,
             key=f"{prefix}_printer_port",
         )
+        align_options = [a.value for a in HeadAlignment]
+        if initial.head_alignment in align_options:
+            align_idx = align_options.index(initial.head_alignment)
+        else:
+            align_idx = align_options.index(HeadAlignment.RIGHT.value)
+        head_alignment = st.selectbox(
+            "Label alignment on print head",
+            align_options,
+            index=align_idx,
+            key=f"{prefix}_head_alignment",
+            help="Where the label sits under the 384-dot print head. "
+            "Right matches the TF P2 (head right-aligned on paper); "
+            "Center matches the XP-D463B (paper centred under the head).",
+        )
+    return port, head_alignment
 
 
 def _type_section(initial: LabelConfig, prefix: str) -> tuple[str, TypeSpecific]:

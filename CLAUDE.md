@@ -75,7 +75,7 @@ Target is a **TF P2 Bluetooth thermal label printer** (see `memory/project_print
 
 Quirks that must be preserved when editing:
 
-- The print head is **right-aligned on the paper**. `set_label_size` computes `left_margin_dots = MAX_WIDTH_DOTS - width_dots` and issues `GS L` so the origin ends up at the label's left edge. Changing this breaks horizontal alignment for any label narrower than 48 mm.
+- The label's position under the head is **per-config** via `LabelConfig.head_alignment` (`HeadAlignment.LEFT/CENTER/RIGHT`, default `RIGHT`). `set_label_size` computes `free_dots = MAX_WIDTH_DOTS - width_dots` and emits `GS L` with `free_dots` (RIGHT), `free_dots // 2` (CENTER), or `0` (LEFT). The TF P2's head is right-aligned on the paper, so it needs `RIGHT`; the XP-D463B feeds paper through the centre of the head, so it needs `CENTER`. The CLI's `cmd_print` and `print_image_with_config` both pass `cfg.head_alignment` through to `LabelPrinter`.
 - `__init__` sends `Cmd.SET_MOTION_UNITS_DOTS` (`GS P 203 203`) so motion-unit commands (`GS L`, `GS W`, `GS $`, etc.) take **dot counts** directly at ~203 dpi. Re-sending `GS P` with different values silently rescales every subsequent geometry command.
 - `print_bitmap` emits raster via `_GS_V_RASTER_BIT_IMAGE` (`GS v 0`). Width must be padded up to a byte boundary (`(label_w + 7) & ~7`). The raster is sized to the full label area and the bitmap is placed inside it per `HAlign`/`VAlign`, so input smaller than the label is offset rather than scaled.
 - PIL mode `'1'`: `0 = black, 255 = white`. Printer wire format: `1 = black dot`. `_to_bit_grid` does the inversion — keep this in mind when accepting other bitmap types.

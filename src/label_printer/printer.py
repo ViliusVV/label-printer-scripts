@@ -14,7 +14,7 @@ from pathlib import Path
 import serial
 from PIL import Image
 
-from label_printer.config import LabelConfig
+from label_printer.config import HeadAlignment, LabelConfig
 
 log = logging.getLogger(__name__)
 
@@ -81,6 +81,7 @@ class LabelPrinter:
         baud: int = 9600,
         label_width_mm: int = MAX_WIDTH_DOTS // DOTS_PER_MM,
         label_height_mm: int = 30,
+        head_alignment: str = HeadAlignment.RIGHT.value,
     ) -> None:
         # Check if label is not over limit
         if label_width_mm > (LabelPrinter.MAX_WIDTH_DOTS // LabelPrinter.DOTS_PER_MM):
@@ -88,6 +89,7 @@ class LabelPrinter:
 
         self.label_width_mm = label_width_mm
         self.label_height_mm = label_height_mm
+        self.head_alignment = head_alignment
         self.ser = serial.Serial(port, baud)
 
         self.send(Cmd.INIT)
@@ -107,16 +109,25 @@ class LabelPrinter:
         self.label_height_mm = height_mm
         log.debug("Setting label size to %sx%s mm", width_mm, height_mm)
 
-        # The print head is right-aligned on the paper, so for any label
-        # narrower than 48 mm we offset the origin by (head_width - label_width)
-        # so the print origin lands on the label's left edge.
+        # `head_alignment` describes where the label sits under the head's
+        # 384-dot span. TF P2's head is right-aligned on the paper, so the
+        # label needs the full free margin on its left (RIGHT). XP-D463B
+        # centres paper under the head (CENTER). LEFT is provided for
+        # symmetry / future printers.
         width_dots = int(width_mm * self.DOTS_PER_MM)
-        left_margin_dots = self.MAX_WIDTH_DOTS - width_dots
-        if width_dots + left_margin_dots > self.MAX_WIDTH_DOTS:
+        free_dots = self.MAX_WIDTH_DOTS - width_dots
+        if free_dots < 0:
             raise ValueError(
-                f"Label too wide: {width_dots} dots + {left_margin_dots} margin "
-                f"> {self.MAX_WIDTH_DOTS} max"
+                f"Label too wide: {width_dots} dots > {self.MAX_WIDTH_DOTS} max"
             )
+        if self.head_alignment == HeadAlignment.LEFT.value:
+            left_margin_dots = 0
+        elif self.head_alignment == HeadAlignment.CENTER.value:
+            left_margin_dots = free_dots // 2
+        elif self.head_alignment == HeadAlignment.RIGHT.value:
+            left_margin_dots = free_dots
+        else:
+            raise ValueError(f"Unknown head_alignment: {self.head_alignment!r}")
         log.debug(
             "Left margin: %d, Width: %d, Total: %d",
             left_margin_dots,
@@ -287,6 +298,7 @@ def print_image_with_config(
         cfg.printer_port,
         label_width_mm=cfg.width_mm,
         label_height_mm=cfg.height_mm,
+        head_alignment=cfg.head_alignment,
     ) as p:
         p.print_bitmap(img, halign=halign, valign=valign)
         if feed_after:

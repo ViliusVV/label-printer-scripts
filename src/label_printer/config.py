@@ -22,6 +22,20 @@ class SkeletonType(StrEnum):
     TEXT = "TEXT"
 
 
+class HeadAlignment(StrEnum):
+    """Where the label sits under the printer's print head.
+
+    The TF P2 head is right-aligned on the paper, so a sub-48 mm label must
+    be pushed to the right of the head's 384-dot span (`RIGHT`). The
+    XP-D463B feeds paper through the centre of the head, so the same label
+    is naturally centred (`CENTER`). `LEFT` is provided for symmetry.
+    """
+
+    LEFT = "left"
+    CENTER = "center"
+    RIGHT = "right"
+
+
 @dataclass
 class LineConfig:
     name: str = ""  # human label shown in the UI + CSV header; falls back to "Line N"
@@ -85,6 +99,7 @@ class LabelConfig:
 
     # Printer
     printer_port: str = "COM4"
+    head_alignment: str = HeadAlignment.RIGHT.value
 
     # Manual-mode text matrix saved by the Streamlit app.
     # Shape: cells_per_label rows × len(lines) columns. Cells/lines beyond
