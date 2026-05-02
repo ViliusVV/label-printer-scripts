@@ -1,5 +1,5 @@
 type: VIAL_TOP
-width_mm: 36.0
+width_mm: 30.0
 height_mm: 30.0
 dots_per_mm: 8
 count_x: 2
@@ -48,6 +48,7 @@ octa_vertical_segment_mm: 6.0
 text_width_mm: 36.0
 text_height_mm: 30.0
 printer_port: COM4
+head_alignment: center
 manual:
 - - Zener
   - 10V

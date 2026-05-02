@@ -1,0 +1,110 @@
+type: VIAL_TOP_OCTA
+width_mm: 48.0
+height_mm: 60.0
+dots_per_mm: 8
+count_x: 3
+count_y: 4
+gap_mm: -0.135
+outline_px: 1
+lines:
+- name: ComponentType
+  font_path: C:/Windows/Fonts/constanb.ttf
+  size_px: 12
+  bold: false
+  italic: false
+  underline: false
+  underline_offset_px: 0
+  letter_spacing_px: 1
+  offset_x_px: 0
+  offset_y_px: -49
+  default_text: ''
+- name: ComponentName
+  font_path: C:/Windows/Fonts/consolab.ttf
+  size_px: 16
+  bold: false
+  italic: false
+  underline: false
+  underline_offset_px: 0
+  letter_spacing_px: 0
+  offset_x_px: 0
+  offset_y_px: -31
+  default_text: ''
+- name: ComponentValue
+  font_path: C:/Windows/Fonts/GOTHICB.TTF
+  size_px: 24
+  bold: false
+  italic: false
+  underline: false
+  underline_offset_px: 0
+  letter_spacing_px: -1
+  offset_x_px: 0
+  offset_y_px: -2
+  default_text: ''
+- name: ComponentVariant
+  font_path: C:/Windows/Fonts/verdanab.ttf
+  size_px: 12
+  bold: false
+  italic: false
+  underline: true
+  underline_offset_px: 0
+  letter_spacing_px: 0
+  offset_x_px: 0
+  offset_y_px: 29
+  default_text: '        '
+circle_diameter_mm: 14.5
+octa_width_mm: 14.5
+octa_height_mm: 14.0
+octa_horizontal_segment_mm: 5.5
+octa_vertical_segment_mm: 5.5
+text_width_mm: 36.0
+text_height_mm: 30.0
+printer_port: COM4
+manual:
+- - SMD
+  - Capacitor
+  - 50uF
+  - ''
+- - SMD
+  - Oscillator
+  - 32.786KHz
+  - Trimmer
+- - ''
+  - ''
+  - ''
+  - ''
+- - ''
+  - ''
+  - ''
+  - ''
+- - ''
+  - ''
+  - ''
+  - ''
+- - ''
+  - ''
+  - ''
+  - ''
+- - ''
+  - ''
+  - ''
+  - ''
+- - ''
+  - ''
+  - ''
+  - ''
+- - ''
+  - ''
+  - ''
+  - ''
+- - ''
+  - ''
+  - ''
+  - ''
+- - ''
+  - ''
+  - ''
+  - ''
+- - ''
+  - ''
+  - ''
+  - ''

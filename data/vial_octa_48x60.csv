@@ -1,0 +1,13 @@
+line_1,line_2,line_3,line_4
+TH,Resistor,R4k7,
+TH,Schottky,1N5819,1A 40V
+TH,Schottky,SB5100,5A 100V
+TH,Diode,1N4007,1A 1000V
+TH,Crystal,32.768KHz,Oscillator
+TH,Resistor,R2k2,
+TH,Resistor,R5k1,
+TH,Resistor,R3k3,
+TH,Resistor,R6k8,
+TH,,,
+TH,,,
+TH,,,
