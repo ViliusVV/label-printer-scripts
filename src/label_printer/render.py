@@ -252,8 +252,11 @@ def _render_text_image(
         x = float(pad)
         y = pad - top
         for c, adv in zip(chars, char_advances, strict=False):
+            # Snap to integer pixel so each glyph hits the same subpixel phase;
+            # otherwise mode-'1' thresholding makes adjacent letters render
+            # thin/fat depending on their fractional x.
             d.text(
-                (x, y),
+                (round(x), y),
                 c,
                 fill=0,
                 font=font,

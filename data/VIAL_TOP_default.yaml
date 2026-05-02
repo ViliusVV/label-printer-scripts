@@ -14,6 +14,7 @@ lines:
   italic: false
   underline: true
   underline_offset_px: 0
+  letter_spacing_px: 0
   offset_x_px: 0
   offset_y_px: -39
   default_text: ''
@@ -24,6 +25,7 @@ lines:
   italic: false
   underline: false
   underline_offset_px: 0
+  letter_spacing_px: 0
   offset_x_px: 0
   offset_y_px: 0
   default_text: '       '
@@ -34,6 +36,7 @@ lines:
   italic: false
   underline: true
   underline_offset_px: 0
+  letter_spacing_px: 0
   offset_x_px: 0
   offset_y_px: 26
   default_text: '      '

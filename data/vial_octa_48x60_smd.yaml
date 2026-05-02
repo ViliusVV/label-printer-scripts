@@ -9,7 +9,7 @@ outline_px: 1
 lines:
 - name: ComponentType
   font_path: C:/Windows/Fonts/constanb.ttf
-  size_px: 10
+  size_px: 12
   bold: false
   italic: false
   underline: false
@@ -20,37 +20,37 @@ lines:
   default_text: ''
 - name: ComponentName
   font_path: C:/Windows/Fonts/consolab.ttf
-  size_px: 14
+  size_px: 16
   bold: false
   italic: false
   underline: false
   underline_offset_px: 0
   letter_spacing_px: 0
   offset_x_px: 0
-  offset_y_px: -17
+  offset_y_px: -31
   default_text: ''
 - name: ComponentValue
   font_path: C:/Windows/Fonts/GOTHICB.TTF
-  size_px: 25
+  size_px: 24
   bold: false
   italic: false
   underline: false
   underline_offset_px: 0
-  letter_spacing_px: 0
+  letter_spacing_px: -1
   offset_x_px: 0
-  offset_y_px: 0
+  offset_y_px: -2
   default_text: ''
 - name: ComponentVariant
-  font_path: C:/Windows/Fonts/consola.ttf
-  size_px: 28
+  font_path: C:/Windows/Fonts/verdanab.ttf
+  size_px: 12
   bold: false
   italic: false
   underline: true
   underline_offset_px: 0
   letter_spacing_px: 0
   offset_x_px: 0
-  offset_y_px: 13
-  default_text: '  '
+  offset_y_px: 29
+  default_text: '        '
 circle_diameter_mm: 14.5
 octa_width_mm: 14.5
 octa_height_mm: 14.0
@@ -65,6 +65,6 @@ manual:
   - 50uF
   - ''
 - - SMD
-  - Photoresistor
-  - R50
-  - ''
+  - Oscillator
+  - 32.786KHz
+  - Trimmer
