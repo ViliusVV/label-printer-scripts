@@ -2,14 +2,15 @@ import { createResource, createSignal, For, Show } from "solid-js";
 import { treaty } from "@elysiajs/eden";
 import type { App as ServerApp } from "../shared/api.ts";
 
-const api = treaty<ServerApp>(window.location.origin);
+const app = treaty<ServerApp>(window.location.origin);
+type InputEntry = { index: number; text: string };
 
 export default function App() {
   const [text, setText] = createSignal("");
   const [highlightFirst, setHighlightFirst] = createSignal(false);
   const [entries, { refetch }] = createResource(async () => {
-    const { data } = await api.api.list.get();
-    return data ?? [];
+    const { data } = await app.api.inputs.list.get();
+    return (data ?? []) as InputEntry[];
   });
 
   let inputRef: HTMLInputElement | undefined;
@@ -20,10 +21,15 @@ export default function App() {
     if (!v) return;
     setText("");
     inputRef?.focus();
-    await api.api.add.post({ text: v });
+    await app.api.inputs.add.post({ text: v });
     await refetch();
     setHighlightFirst(true);
     setTimeout(() => setHighlightFirst(false), 2500);
+  };
+
+  const remove = async (index: number) => {
+    await app.api.inputs.delete.post({ index });
+    await refetch();
   };
 
   return (
@@ -48,14 +54,21 @@ export default function App() {
       >
         <ul class="divide-y divide-gray-200">
           <For each={entries()}>
-            {(line, i) => (
+            {(entry, i) => (
               <li
                 classList={{
-                  "px-3 py-3 text-lg rounded": true,
+                  "px-3 py-3 text-lg rounded flex items-center justify-between gap-3": true,
                   "animate-flash": highlightFirst() && i() === 0,
                 }}
               >
-                {line}
+                <span class="truncate">{entry.text}</span>
+                <button
+                  type="button"
+                  class="rounded border border-red-300 px-2 py-1 text-sm text-red-700 hover:bg-red-50"
+                  onClick={() => void remove(entry.index)}
+                >
+                  Delete
+                </button>
               </li>
             )}
           </For>

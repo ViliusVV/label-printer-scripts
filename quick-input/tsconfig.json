@@ -13,7 +13,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "types": ["node", "vite/client"]
+    "types": ["bun", "node", "vite/client"]
   },
   "include": ["src/**/*", "vite.config.ts"]
 }
