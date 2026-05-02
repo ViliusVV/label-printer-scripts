@@ -37,9 +37,9 @@ The `label-printer` console script is wired via `[project.scripts]` to `label_pr
 Two layers that stay deliberately decoupled:
 
 1. **Label rendering** (`label_printer.config` + `label_printer.render` + `label_printer.csv_io`) — pure PIL. Produces a mode `'1'` bitmap. Knows nothing about serial/ESC/POS.
-2. **Printer transport** (`label_printer.printer`) — `LabelPrinter` class, ESC/POS over `pyserial`. Knows nothing about fonts, CSVs, or skeleton types.
+2. **Printer transport** (`label_printer.printer`) — two protocol classes (`ESCPrinter` for ESC/POS, `TSPLPrinter` for TSPL/TSPL2) over `pyserial`, sharing a `_SerialPrinter` base for serial open/close + bit-grid normalisation. Knows nothing about fonts, CSVs, or skeleton types.
 
-The CLI (`label_printer.cli`) and Streamlit app (`label_printer.app`) compose the two by passing a PIL Image from layer 1 into `LabelPrinter.print_bitmap`. The shared "open printer → print → close" helper is `printer.print_image_with_config(img, cfg)`; the CLI's batch-print path opens the printer via `with LabelPrinter(...) as p:` (context-manager support is in `LabelPrinter.__enter__/__exit__`).
+The CLI (`label_printer.cli`) and Streamlit app (`label_printer.app`) compose the two by passing a PIL Image from layer 1 into `<Printer>.print_bitmap`. The shared "open printer → print → close" helpers live in `printer`: `make_printer(cfg)` returns the right protocol class for `cfg.command_set` (`escpos` → `ESCPrinter`, `tspl` → `TSPLPrinter`), and `print_image_with_config(img, cfg)` wraps a single-image print. The CLI's batch-print path opens via `with make_printer(cfg) as p:` (context-manager support is on the shared base).
 
 Configs and data live in `data/`. One "skeleton" = one YAML + matching CSV, named `<TYPE>_<variant>.{yaml,csv}`. `csv_path_for(config_path)` returns the sibling CSV — always pair them this way; don't hardcode either.
 
@@ -50,7 +50,7 @@ src/label_printer/
     config.py      # LabelConfig, LineConfig, SkeletonType, csv_path_for, YAML I/O
     render.py      # render_label, _CELL_RENDERERS, _render_lines, font cache
     csv_io.py      # cells_from_csv, pack_cells_to_labels, render_labels_from_csv, save_csv
-    printer.py     # LabelPrinter, HAlign/VAlign/DitherMode, Cmd, print_image_with_config, load_png
+    printer.py     # ESCPrinter + TSPLPrinter (share _SerialPrinter base), HAlign/VAlign/DitherMode, Cmd, make_printer, print_image_with_config, load_png
     cli.py         # argparse entry: print|preview|ui subcommands
     app/
         main.py        # Streamlit entry (streamlit run target)
@@ -71,7 +71,13 @@ All modules use the stdlib `logging` module (`log = logging.getLogger(__name__)`
 
 ### Printer layer (`label_printer.printer`)
 
-Target is a **TF P2 Bluetooth thermal label printer** (see `memory/project_printer_hardware.md`): ESC/POS, 8 dots/mm, **384-dot maximum print width** (48 mm).
+Two supported targets:
+- **TF P2** (Bluetooth thermal label, ESC/POS, 8 dots/mm, **384-dot max width** = 48 mm) — handled by `ESCPrinter`. See `memory/project_printer_hardware.md`.
+- **Xprinter XP-D463B** (USB/Bluetooth label, TSPL/TSPL2, 8 dots/mm) — handled by `TSPLPrinter`.
+
+`make_printer(cfg)` selects the class based on `cfg.command_set` (`CommandSet.ESCPOS` / `CommandSet.TSPL`, default `escpos`). Both classes expose the same surface: constructor `(port, baud, label_width_mm, label_height_mm, head_alignment)`, context-manager support via `_SerialPrinter`, `print_bitmap(img, halign, valign)`, and `next_label()` (TSPL is a no-op since `PRINT` already feeds).
+
+`_SerialPrinter._to_bit_grid` normalises a PIL `'1'` image (or 0/1 sequence) to `1 = black dot`. Both protocol classes consume that grid but encode it differently — `ESCPrinter` writes `1 = black bit` (matches ESC/POS wire format) into a label-sized canvas, while `TSPLPrinter` initialises an all-`0xFF` (white) raster sized to the bitmap and clears bits where black is wanted (TSPL `BITMAP` mode 0: bit `0` = black). Don't conflate the two encodings when editing.
 
 Quirks that must be preserved when editing:
 
@@ -127,7 +133,7 @@ The entry module is `app/main.py`; the CLI's `ui` subcommand spawns `streamlit r
 - **Type-specific UI** lives in `_type_specific_section` (sidebar.py): when `type = VIAL_TOP`, a "Circle diameter" input appears; when `type = TEXT`, a "Text box width/height" pair appears. Add new types' extras there, not at the top.
 - Font picker scans `C:/Windows/Fonts/*.{ttf,otf}` once (`@st.cache_data` in `app/fonts.py`) and maps each file's `(family, style)` from `ImageFont.getname()` to its path. A config path not in the scan is prepended as `(custom) filename`. The scan catches `OSError` only — broader exceptions are intentionally not swallowed.
 - Label bitmaps are embedded through `streamlit.components.v1.html` (not `st.image`) to bypass Streamlit's `img { max-width: 100% }` rule — this is what makes the display-scale slider keep working past ~4×. `image-rendering: pixelated` preserves the printer-dot grid.
-- Per-label "🖨 Print" button calls `printer.print_image_with_config(img, cfg)` which opens a fresh `LabelPrinter` (using its context-manager interface), prints, and closes. Bluetooth serial doesn't survive Streamlit's rerun model cleanly, so don't keep a printer instance alive in session state.
+- Per-label "🖨 Print" button calls `printer.print_image_with_config(img, cfg)` which opens a fresh printer via `make_printer(cfg)` (using its context-manager interface), prints, and closes. Bluetooth serial doesn't survive Streamlit's rerun model cleanly, so don't keep a printer instance alive in session state.
 
 ## Lint / format
 

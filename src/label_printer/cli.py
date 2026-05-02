@@ -17,7 +17,7 @@ from PIL import Image
 
 from label_printer.config import LabelConfig, csv_path_for
 from label_printer.csv_io import render_labels_from_csv
-from label_printer.printer import HAlign, LabelPrinter, VAlign
+from label_printer.printer import HAlign, VAlign, make_printer
 
 DEFAULT_CONFIG = Path("data/VIAL_TOP_default.yaml")
 PREVIEW_SCALE = 6
@@ -93,16 +93,12 @@ def cmd_print(config_path: Path) -> int:
         log.warning("No labels rendered — %s empty?", csv_path)
         return 0
 
-    with LabelPrinter(
-        cfg.printer_port,
-        label_width_mm=cfg.width_mm,
-        label_height_mm=cfg.height_mm,
-        head_alignment=cfg.head_alignment,
-    ) as printer:
+    with make_printer(cfg) as printer:
         for i, img in enumerate(images, 1):
             log.info(
-                "[%s] printing label %d/%d on %s",
+                "[%s/%s] printing label %d/%d on %s",
                 cfg.type,
+                cfg.command_set,
                 i,
                 len(images),
                 cfg.printer_port,

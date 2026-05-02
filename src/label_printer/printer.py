@@ -1,8 +1,15 @@
-"""ESC/POS transport for the TF P2 thermal label printer.
+"""Serial transports for thermal label printers.
 
-This module knows nothing about fonts, CSVs, or skeleton types — it just
-converts a 1-bit bitmap into a raster command stream and writes it to a
-serial port. See `label_printer.render` for the bitmap producer.
+Two protocol classes share a tiny serial-transport base:
+
+- `ESCPrinter` — ESC/POS, used by the TF P2 and similar receipt-style
+  printers. Sends `GS L` / `GS W` / `GS v 0` raster.
+- `TSPLPrinter` — TSPL/TSPL2, used by the Xprinter D-series and most
+  barcode label printers. Sends `SIZE` / `GAP` / `BITMAP` / `PRINT`.
+
+Neither class knows anything about fonts, CSVs, or skeleton types — they
+just take a 1-bit bitmap and push it down the wire. See
+`label_printer.render` for the bitmap producer.
 """
 
 from __future__ import annotations
@@ -10,11 +17,12 @@ from __future__ import annotations
 import logging
 from enum import Enum
 from pathlib import Path
+from typing import ClassVar
 
 import serial
 from PIL import Image
 
-from label_printer.config import HeadAlignment, LabelConfig
+from label_printer.config import CommandSet, HeadAlignment, LabelConfig
 
 log = logging.getLogger(__name__)
 
@@ -66,31 +74,74 @@ class Cmd(Enum):
     GS_V_RASTER_BIT_IMAGE = b"\x1d\x76\x30\x00"  # GS v 0, m=0 (normal)
 
 
-# ---------------------------- LabelPrinter ----------------------------
+# ---------------------------- Shared transport base ----------------------------
 
 
-class LabelPrinter:
-    """ESC/POS-over-serial driver for a TF P2 (8 dots/mm, 384-dot head)."""
+class _SerialPrinter:
+    """Common serial + context-manager scaffolding for both protocol classes."""
 
-    DOTS_PER_MM: int = 8
-    MAX_WIDTH_DOTS: int = 384  # 48 mm * 8 dots/mm
+    DOTS_PER_MM: ClassVar[int] = 8
+
+    def __init__(self, port: str, baud: int = 9600) -> None:
+        self.ser = serial.Serial(port, baud)
+
+    def close(self) -> None:
+        self.ser.close()
+        log.debug("Printer serial closed")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+    @staticmethod
+    def _to_bit_grid(bitmap) -> list[list[int]]:
+        """Normalise a PIL Image '1' or 2D 0/1 sequence to a list[list[int]]
+        where 1 = black dot. PIL '1' has 0=black, so it's inverted here.
+        """
+        if isinstance(bitmap, Image.Image):
+            if bitmap.mode != "1":
+                bitmap = bitmap.convert("1")
+            w, h = bitmap.size
+            px = bitmap.load()
+            return [[1 if px[x, y] == 0 else 0 for x in range(w)] for y in range(h)]
+        rows = list(bitmap)
+        if not rows:
+            return []
+        w = len(rows[0])
+        for r in rows:
+            if len(r) != w:
+                raise ValueError("Bitmap rows must all have the same length")
+        return [[int(v) & 1 for v in r] for r in rows]
+
+
+# ---------------------------- ESCPrinter (ESC/POS) ----------------------------
+
+
+class ESCPrinter(_SerialPrinter):
+    """ESC/POS-over-serial driver for the TF P2 (8 dots/mm, 384-dot head)."""
+
+    MAX_WIDTH_DOTS: ClassVar[int] = 384  # 48 mm * 8 dots/mm
 
     def __init__(
         self,
         port: str,
         baud: int = 9600,
-        label_width_mm: int = MAX_WIDTH_DOTS // DOTS_PER_MM,
+        label_width_mm: int = MAX_WIDTH_DOTS // _SerialPrinter.DOTS_PER_MM,
         label_height_mm: int = 30,
         head_alignment: str = HeadAlignment.RIGHT.value,
     ) -> None:
-        # Check if label is not over limit
-        if label_width_mm > (LabelPrinter.MAX_WIDTH_DOTS // LabelPrinter.DOTS_PER_MM):
-            raise
+        if label_width_mm > (self.MAX_WIDTH_DOTS // self.DOTS_PER_MM):
+            raise ValueError(
+                f"Label width {label_width_mm} mm exceeds head capacity "
+                f"({self.MAX_WIDTH_DOTS // self.DOTS_PER_MM} mm)"
+            )
 
+        super().__init__(port, baud)
         self.label_width_mm = label_width_mm
         self.label_height_mm = label_height_mm
         self.head_alignment = head_alignment
-        self.ser = serial.Serial(port, baud)
 
         self.send(Cmd.INIT)
         self.send(Cmd.SET_MOTION_UNITS_DOTS)
@@ -225,37 +276,146 @@ class LabelPrinter:
         img = load_png(path, dither=dither, threshold=threshold)
         self.print_bitmap(img, halign=halign, valign=valign)
 
-    @staticmethod
-    def _to_bit_grid(bitmap) -> list[list[int]]:
-        if isinstance(bitmap, Image.Image):
-            if bitmap.mode != "1":
-                bitmap = bitmap.convert("1")
-            w, h = bitmap.size
-            px = bitmap.load()
-            # PIL mode '1': 0 = black, 255 = white. Printer: 1 = black dot.
-            return [[1 if px[x, y] == 0 else 0 for x in range(w)] for y in range(h)]
-        rows = list(bitmap)
-        if not rows:
-            return []
-        w = len(rows[0])
-        for r in rows:
-            if len(r) != w:
-                raise ValueError("Bitmap rows must all have the same length")
-        return [[int(v) & 1 for v in r] for r in rows]
-
     def next_label(self) -> None:
         self.send(Cmd.FORM_FEED)
 
-    def close(self) -> None:
-        self.ser.close()
-        log.debug("Printer serial closed")
 
-    # Context-manager support so callers can `with LabelPrinter(...) as p:`.
-    def __enter__(self) -> LabelPrinter:
-        return self
+# ---------------------------- TSPLPrinter (TSPL/TSPL2) ----------------------------
 
-    def __exit__(self, exc_type, exc, tb) -> None:
-        self.close()
+
+class TSPLPrinter(_SerialPrinter):
+    """TSPL/TSPL2 driver for label printers like the Xprinter XP-D463B.
+
+    TSPL is line-based ASCII; commands are CR/LF terminated. Bitmaps go via
+    `BITMAP x,y,width_bytes,height,mode,<raster>` where each raster bit is
+    1 = white / 0 = black (opposite of ESC/POS). The print head is
+    centred over the paper for D-series printers, so `head_alignment` from
+    the config has no effect here — the firmware handles paper width via
+    `SIZE`.
+    """
+
+    EOL: ClassVar[bytes] = b"\r\n"
+
+    def __init__(
+        self,
+        port: str,
+        baud: int = 9600,
+        label_width_mm: float = 40.0,
+        label_height_mm: float = 30.0,
+        gap_mm: float = 2.0,
+        density: int = 8,
+        speed: int = 4,
+        head_alignment: str = HeadAlignment.RIGHT.value,
+    ) -> None:
+        # `head_alignment` is accepted (for parity with ESCPrinter and a
+        # uniform `make_printer` signature) but ignored — TSPL printers
+        # handle paper width via the SIZE command and the head is always
+        # paper-centred for D-series.
+        super().__init__(port, baud)
+        self.label_width_mm = label_width_mm
+        self.label_height_mm = label_height_mm
+        self.gap_mm = gap_mm
+        self.density = density
+        self.speed = speed
+        self.head_alignment = head_alignment
+
+        self.set_label_size(label_width_mm, label_height_mm, gap_mm)
+        self.send_text(f"DENSITY {density}")
+        self.send_text(f"SPEED {speed}")
+        self.send_text("DIRECTION 1")
+        self.send_text("REFERENCE 0,0")
+
+    def send_text(self, line: str) -> None:
+        payload = line.encode("ascii") + self.EOL
+        log.debug("TSPL >>> %s", line)
+        self.ser.write(payload)
+
+    def send_raw(self, data: bytes) -> None:
+        log.debug("TSPL >>> <%d raw bytes>", len(data))
+        self.ser.write(data)
+
+    def set_label_size(
+        self,
+        width_mm: float,
+        height_mm: float,
+        gap_mm: float | None = None,
+    ) -> None:
+        self.label_width_mm = width_mm
+        self.label_height_mm = height_mm
+        if gap_mm is not None:
+            self.gap_mm = gap_mm
+        # TSPL accepts decimal mm via "SIZE w mm,h mm".
+        self.send_text(f"SIZE {width_mm} mm,{height_mm} mm")
+        self.send_text(f"GAP {self.gap_mm} mm,0 mm")
+
+    @property
+    def width_dots(self) -> int:
+        return int(self.label_width_mm * self.DOTS_PER_MM)
+
+    @property
+    def height_dots(self) -> int:
+        return int(self.label_height_mm * self.DOTS_PER_MM)
+
+    def print_bitmap(
+        self,
+        bitmap: Image.Image | list[list[int]] | tuple[tuple[int, ...], ...],
+        halign: HAlign = HAlign.LEFT,
+        valign: VAlign = VAlign.TOP,
+        copies: int = 1,
+    ) -> None:
+        """Render a 1-bit bitmap as a single TSPL `BITMAP` + `PRINT`.
+
+        Honours HAlign/VAlign by positioning the bitmap inside the full
+        label area (same convention as `ESCPrinter.print_bitmap`).
+        """
+        bits = self._to_bit_grid(bitmap)
+        bm_h = len(bits)
+        bm_w = len(bits[0]) if bm_h else 0
+
+        label_w = self.width_dots
+        label_h = self.height_dots
+
+        if bm_w > label_w or bm_h > label_h:
+            raise ValueError(f"Bitmap {bm_w}x{bm_h} dots exceeds label {label_w}x{label_h} dots")
+
+        x_offset = {
+            HAlign.LEFT: 0,
+            HAlign.CENTER: (label_w - bm_w) // 2,
+            HAlign.RIGHT: label_w - bm_w,
+        }[halign]
+        y_offset = {
+            VAlign.TOP: 0,
+            VAlign.MIDDLE: (label_h - bm_h) // 2,
+            VAlign.BOTTOM: label_h - bm_h,
+        }[valign]
+
+        # TSPL BITMAP: bit 0 = black, bit 1 = white. Initialise raster to
+        # all-1 (white) and clear bits where we want black.
+        width_bytes = (bm_w + 7) // 8
+        raster = bytearray([0xFF] * (width_bytes * bm_h))
+        for y in range(bm_h):
+            row = bits[y]
+            for x in range(bm_w):
+                if row[x]:  # 1 = black dot from _to_bit_grid
+                    raster[y * width_bytes + (x >> 3)] &= ~(0x80 >> (x & 7)) & 0xFF
+
+        self.send_text("CLS")
+        header = f"BITMAP {x_offset},{y_offset},{width_bytes},{bm_h},0,".encode("ascii")
+        log.debug(
+            "TSPL bitmap: %dx%d at (%d,%d), %d bytes raster",
+            bm_w,
+            bm_h,
+            x_offset,
+            y_offset,
+            len(raster),
+        )
+        self.ser.write(header + bytes(raster) + self.EOL)
+        self.send_text(f"PRINT 1,{copies}")
+
+    def next_label(self) -> None:
+        # TSPL's PRINT already feeds to the next label. Issue a FORMFEED
+        # only if explicitly needed; default is no-op.
+        return
 
 
 # ---------------------------- Helpers ----------------------------
@@ -281,6 +441,25 @@ def load_png(
     raise ValueError(f"Unknown dither mode: {dither}")
 
 
+def make_printer(cfg: LabelConfig) -> ESCPrinter | TSPLPrinter:
+    """Open a printer of the right protocol based on `cfg.command_set`."""
+    if cfg.command_set == CommandSet.ESCPOS.value:
+        return ESCPrinter(
+            cfg.printer_port,
+            label_width_mm=cfg.width_mm,
+            label_height_mm=cfg.height_mm,
+            head_alignment=cfg.head_alignment,
+        )
+    if cfg.command_set == CommandSet.TSPL.value:
+        return TSPLPrinter(
+            cfg.printer_port,
+            label_width_mm=cfg.width_mm,
+            label_height_mm=cfg.height_mm,
+            head_alignment=cfg.head_alignment,
+        )
+    raise ValueError(f"Unknown command_set: {cfg.command_set!r}")
+
+
 def print_image_with_config(
     img: Image.Image,
     cfg: LabelConfig,
@@ -292,14 +471,10 @@ def print_image_with_config(
 
     Shared by the CLI (`label_printer print`) and the Streamlit per-label
     Print button. Bluetooth serial doesn't survive a long-lived instance
-    cleanly, so each call opens fresh.
+    cleanly, so each call opens fresh. The protocol class is chosen from
+    `cfg.command_set`.
     """
-    with LabelPrinter(
-        cfg.printer_port,
-        label_width_mm=cfg.width_mm,
-        label_height_mm=cfg.height_mm,
-        head_alignment=cfg.head_alignment,
-    ) as p:
+    with make_printer(cfg) as p:
         p.print_bitmap(img, halign=halign, valign=valign)
         if feed_after:
             p.next_label()

@@ -3,11 +3,11 @@
 Not part of the package — invoke directly with `python sandbox/main.py`.
 """
 
-from label_printer.printer import DitherMode, HAlign, LabelPrinter, VAlign
+from label_printer.printer import DitherMode, ESCPrinter, HAlign, VAlign
 
 PORT = "COM4"
 
-printer = LabelPrinter(PORT, label_width_mm=36)
+printer = ESCPrinter(PORT, label_width_mm=36)
 
 
 def esc_hello() -> None:

@@ -36,6 +36,19 @@ class HeadAlignment(StrEnum):
     RIGHT = "right"
 
 
+class CommandSet(StrEnum):
+    """Wire protocol the printer speaks.
+
+    `ESCPOS`: TF P2 and similar receipt-style label printers — `GS L`,
+    `GS W`, `GS v 0` raster.
+    `TSPL`: Xprinter D-series and most barcode label printers — `SIZE`,
+    `GAP`, `BITMAP`, `PRINT`.
+    """
+
+    ESCPOS = "escpos"
+    TSPL = "tspl"
+
+
 @dataclass
 class LineConfig:
     name: str = ""  # human label shown in the UI + CSV header; falls back to "Line N"
@@ -99,6 +112,7 @@ class LabelConfig:
 
     # Printer
     printer_port: str = "COM4"
+    command_set: str = CommandSet.ESCPOS.value
     head_alignment: str = HeadAlignment.RIGHT.value
 
     # Manual-mode text matrix saved by the Streamlit app.
