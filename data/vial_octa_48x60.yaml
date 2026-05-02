@@ -59,6 +59,8 @@ octa_vertical_segment_mm: 5.5
 text_width_mm: 36.0
 text_height_mm: 30.0
 printer_port: COM4
+command_set: escpos
+head_alignment: right
 manual:
 - - SMD
   - Capacitor

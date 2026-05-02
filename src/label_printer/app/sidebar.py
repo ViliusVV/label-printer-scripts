@@ -129,22 +129,26 @@ def _printer_section(initial: LabelConfig, prefix: str) -> tuple[str, str, str]:
             "ESC/POS for the TF P2 (and similar receipt-style printers); "
             "TSPL for the Xprinter D-series (and most barcode label printers).",
         )
-        align_options = [a.value for a in HeadAlignment]
-        if initial.head_alignment in align_options:
-            align_idx = align_options.index(initial.head_alignment)
+        # Head alignment only matters for ESC/POS — TSPL printers handle
+        # paper width via the `SIZE` command. Carry the saved value through
+        # untouched in TSPL mode so switching back to ESC/POS preserves it.
+        if command_set == CommandSet.ESCPOS.value:
+            align_options = [a.value for a in HeadAlignment]
+            if initial.head_alignment in align_options:
+                align_idx = align_options.index(initial.head_alignment)
+            else:
+                align_idx = align_options.index(HeadAlignment.RIGHT.value)
+            head_alignment = st.selectbox(
+                "Label alignment on print head",
+                align_options,
+                index=align_idx,
+                key=f"{prefix}_head_alignment",
+                help="Where the label sits under the 384-dot print head. "
+                "Right matches the TF P2 (head right-aligned on paper); "
+                "Center matches an ESC/POS printer that centres paper under the head.",
+            )
         else:
-            align_idx = align_options.index(HeadAlignment.RIGHT.value)
-        head_alignment = st.selectbox(
-            "Label alignment on print head",
-            align_options,
-            index=align_idx,
-            key=f"{prefix}_head_alignment",
-            help="Where the label sits under the 384-dot print head. "
-            "Right matches the TF P2 (head right-aligned on paper); "
-            "Center matches the XP-D463B (paper centred under the head). "
-            "Ignored when Command set = TSPL — TSPL printers handle paper "
-            "width via the `SIZE` command.",
-        )
+            head_alignment = initial.head_alignment
     return port, command_set, head_alignment
 
 

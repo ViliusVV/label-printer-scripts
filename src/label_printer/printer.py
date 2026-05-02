@@ -289,9 +289,8 @@ class TSPLPrinter(_SerialPrinter):
     TSPL is line-based ASCII; commands are CR/LF terminated. Bitmaps go via
     `BITMAP x,y,width_bytes,height,mode,<raster>` where each raster bit is
     1 = white / 0 = black (opposite of ESC/POS). The print head is
-    centred over the paper for D-series printers, so `head_alignment` from
-    the config has no effect here — the firmware handles paper width via
-    `SIZE`.
+    centred over the paper, so there is no `head_alignment` knob here —
+    the firmware handles paper width via `SIZE`.
     """
 
     EOL: ClassVar[bytes] = b"\r\n"
@@ -305,19 +304,13 @@ class TSPLPrinter(_SerialPrinter):
         gap_mm: float = 2.0,
         density: int = 8,
         speed: int = 4,
-        head_alignment: str = HeadAlignment.RIGHT.value,
     ) -> None:
-        # `head_alignment` is accepted (for parity with ESCPrinter and a
-        # uniform `make_printer` signature) but ignored — TSPL printers
-        # handle paper width via the SIZE command and the head is always
-        # paper-centred for D-series.
         super().__init__(port, baud)
         self.label_width_mm = label_width_mm
         self.label_height_mm = label_height_mm
         self.gap_mm = gap_mm
         self.density = density
         self.speed = speed
-        self.head_alignment = head_alignment
 
         self.set_label_size(label_width_mm, label_height_mm, gap_mm)
         self.send_text(f"DENSITY {density}")
@@ -455,7 +448,6 @@ def make_printer(cfg: LabelConfig) -> ESCPrinter | TSPLPrinter:
             cfg.printer_port,
             label_width_mm=cfg.width_mm,
             label_height_mm=cfg.height_mm,
-            head_alignment=cfg.head_alignment,
         )
     raise ValueError(f"Unknown command_set: {cfg.command_set!r}")
 
