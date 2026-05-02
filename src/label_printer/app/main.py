@@ -17,7 +17,7 @@ from label_printer.app.sidebar import render_sidebar
 from label_printer.app.text_source import render_text_source
 from label_printer.config import LabelConfig, SkeletonType, csv_path_for
 from label_printer.csv_io import save_csv
-from label_printer.printer import HAlign, VAlign, print_image_with_config
+from label_printer.printer import HAlign, VAlign, make_printer, print_image_with_config
 from label_printer.render import render_label
 
 DATA_DIR = Path("data")
@@ -35,7 +35,7 @@ def main() -> None:
 
     cfg = render_sidebar(initial, prefix)
 
-    label_batches, cfg.manual = render_text_source(
+    label_batches, cfg.manual, is_csv = render_text_source(
         cfg,
         csv_path,
         prefix,
@@ -49,7 +49,7 @@ def main() -> None:
     except OSError as e:
         st.sidebar.error(f"Couldn't save {config_path.name}: {e}")
 
-    _render_labels(cfg, label_batches, prefix)
+    _render_labels(cfg, label_batches, prefix, is_csv=is_csv)
 
 
 def _config_picker() -> tuple[Path, str]:
@@ -131,6 +131,7 @@ def _render_labels(
     cfg: LabelConfig,
     label_batches: list[list[list[str]]],
     prefix: str,
+    is_csv: bool = False,
 ) -> None:
     scale = st.slider("Display scale", 1, 4, 2, key="scale")
 
@@ -140,13 +141,22 @@ def _render_labels(
         f"grid {cfg.count_x}×{cfg.count_y} · {len(label_batches)} label(s)"
     )
 
+    # Pre-render every batch so a "Print all" can reuse the same images
+    # without re-rendering, and a per-label render error doesn't block the
+    # rest of the previews.
+    rendered: list[tuple[int, list[list[str]], object]] = []
     for i, batch in enumerate(label_batches, 1):
         try:
             img = render_label(batch, cfg)
         except Exception as e:
             st.error(f"Label {i}: {e}")
             continue
+        rendered.append((i, batch, img))
 
+    if is_csv and rendered:
+        _render_print_all_button(cfg, rendered, prefix)
+
+    for i, batch, img in rendered:
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         png_bytes = buf.getvalue()
@@ -185,6 +195,38 @@ def _render_labels(
                 st.success(f"Sent label {i} to {cfg.printer_port}")
             except Exception as e:
                 st.error(f"Print failed: {e}")
+
+
+def _render_print_all_button(
+    cfg: LabelConfig,
+    rendered: list,
+    prefix: str,
+) -> None:
+    """Open the printer once and stream every pre-rendered label through it."""
+    n = len(rendered)
+    if not st.button(
+        f"🖨 Print all ({n} label{'s' if n != 1 else ''})",
+        key=f"{prefix}_print_all",
+        type="primary",
+    ):
+        return
+    progress = st.progress(0.0, text=f"Printing 0/{n} on {cfg.printer_port}…")
+    try:
+        with make_printer(cfg) as p:
+            for k, (_i, _batch, img) in enumerate(rendered, 1):
+                p.print_bitmap(img, halign=HAlign.LEFT, valign=VAlign.TOP)
+                p.next_label()
+                progress.progress(k / n, text=f"Printing {k}/{n} on {cfg.printer_port}…")
+                # Inter-label pause: lets the printer finish feeding/cutting
+                # before the next raster lands, and keeps BT serial from
+                # back-pressuring on small buffers.
+                # if k < n:
+                    # time.sleep(0.5)
+        progress.empty()
+        st.success(f"Sent {n} label(s) to {cfg.printer_port}")
+    except Exception as e:
+        progress.empty()
+        st.error(f"Batch print failed: {e}")
 
 
 # Streamlit imports the module top-level when launched via `streamlit run`,

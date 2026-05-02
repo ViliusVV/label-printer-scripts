@@ -25,12 +25,13 @@ def render_text_source(
     csv_path: Path,
     prefix: str,
     initial_manual: list[list[str]],
-) -> tuple[list[list[Cell]], list[list[str]]]:
-    """Returns (label_batches, manual_matrix_to_persist).
+) -> tuple[list[list[Cell]], list[list[str]], bool]:
+    """Returns (label_batches, manual_matrix_to_persist, is_csv).
 
     In Manual mode the second element is the captured matrix; in CSV mode it
     is `initial_manual` unchanged so switching sources doesn't lose the side
-    that wasn't active.
+    that wasn't active. `is_csv` lets the caller decide whether to expose
+    batch-print controls (only meaningful when the CSV may produce many labels).
     """
     source = st.radio("Text source", ["Manual", csv_path.name], horizontal=True)
     n_cols = len(cfg.lines)
@@ -40,14 +41,14 @@ def render_text_source(
     if source == "Manual":
         cells = _render_manual(cfg, n_cols, cells_per_label, initial_manual, prefix)
         label_batches = [cells] if cells else []
-        return label_batches, cells
+        return label_batches, cells, False
 
     csv_cells = _render_csv_editor(cfg, csv_path, n_cols, col_names, prefix)
     label_batches = pack_cells_to_labels(csv_cells, cells_per_label)
     if not label_batches:
         st.info("CSV has no rows — add some via the table above.")
         st.stop()
-    return label_batches, initial_manual
+    return label_batches, initial_manual, True
 
 
 def _render_manual(
@@ -96,6 +97,18 @@ def _render_csv_editor(
     # its input), which drops the in-flight keystroke that triggered the
     # rerun — manifests as the second edit "disappearing" after Enter.
     df_state_key = f"{prefix}_csv_df_{n_cols}"
+    editor_key = f"{prefix}_csv_editor_{n_cols}"
+
+    if st.button(
+        "↻ Reload from disk",
+        key=f"{prefix}_csv_reload",
+        help="Discard the in-memory editor state and re-read the CSV from disk. "
+        "Use this after editing the file in another program.",
+    ):
+        st.session_state.pop(df_state_key, None)
+        st.session_state.pop(editor_key, None)
+        st.rerun()
+
     if df_state_key not in st.session_state:
         try:
             loaded = cells_from_csv(csv_path)
@@ -110,7 +123,7 @@ def _render_csv_editor(
         st.session_state[df_state_key],
         num_rows="dynamic",
         use_container_width=True,
-        key=f"{prefix}_csv_editor_{n_cols}",
+        key=editor_key,
         column_config={
             col_names[j]: st.column_config.TextColumn(line_display_name(cfg.lines[j], j))
             for j in range(n_cols)
