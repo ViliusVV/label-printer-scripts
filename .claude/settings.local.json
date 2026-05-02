@@ -20,7 +20,24 @@
       "Bash(curl -s -o /dev/null -w \"GET / -> %{http_code}\\\\n\" http://127.0.0.1:3000/)",
       "Bash(curl -s -X POST -H \"Content-Type: text/plain\" --data \"smoke-test-entry\" -o /dev/null -w \"POST /add -> %{http_code}\\\\n\" http://127.0.0.1:3000/add)",
       "Bash(curl -s -w \"\\\\nGET /list -> %{http_code}\\\\n\" http://127.0.0.1:3000/list)",
-      "Bash(curl -s -X POST -H \"Content-Type: text/plain\" --data \"smoke2\" -o /dev/null -w \"POST -> %{http_code}\\\\n\" http://127.0.0.1:3000/add)"
+      "Bash(curl -s -X POST -H \"Content-Type: text/plain\" --data \"smoke2\" -o /dev/null -w \"POST -> %{http_code}\\\\n\" http://127.0.0.1:3000/add)",
+      "Bash(curl -s -X POST -H \"Content-Type: application/json\" --data '{\"text\":\"smoke3\"}' -o /dev/null -w \"POST /api/add -> %{http_code}\\\\n\" http://127.0.0.1:3000/api/add)",
+      "Bash(curl -s -w \"\\\\nGET /api/list -> %{http_code}\\\\n\" http://127.0.0.1:3000/api/list)",
+      "Bash(curl -v -X POST -H \"Content-Type: application/json\" --data '{\"text\":\"smoke3\"}' http://127.0.0.1:3000/api/add)",
+      "Bash(curl -s -X POST -H \"Content-Type: application/json\" --data '{\"text\":\"smoke3\"}' -w \"POST /api/add -> %{http_code}\\\\n\" http://127.0.0.1:3000/api/add)",
+      "Bash(curl -s -X POST -H \"Content-Type: application/json\" --data '{\"text\":\"smoke3\"}' -w \"  POST /api/add response: %{http_code}\\\\n\" http://127.0.0.1:3000/api/add)",
+      "Bash(curl -s -w \"GET /api/list -> %{http_code}  body: \" http://127.0.0.1:3000/api/list)",
+      "Bash(curl -s -X POST -H \"Content-Type: application/json\" --data '{\"text\":\"smoke3\"}' http://127.0.0.1:3000/api/add -w \"\\\\n  POST /api/add -> %{http_code}\\\\n\")",
+      "Bash(curl -s http://127.0.0.1:3000/api/list -w \"\\\\n  GET /api/list -> %{http_code}\\\\n\")",
+      "Bash(curl -s http://127.0.0.1:3001/api/list -w \"\\\\nGET /api/list -> %{http_code}\\\\n\")",
+      "Bash(curl -s -X POST -H \"Content-Type: application/json\" --data '{\"text\":\"hi\"}' http://127.0.0.1:3001/api/add -w \"\\\\nPOST /api/add -> %{http_code}\\\\n\")",
+      "Bash(curl -s http://127.0.0.1:3001/ -w \"\\\\nGET / -> %{http_code}\\\\n\")",
+      "Bash(curl -s http://127.0.0.1:3000/api/list -w \"\\\\nGET /api/list -> %{http_code}\\\\n\")",
+      "Bash(curl -s -X POST -H \"Content-Type: application/json\" --data '{\"text\":\"hi\"}' http://127.0.0.1:3000/api/add -w \"\\\\nPOST /api/add -> %{http_code}\\\\n\")",
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(curl -s -o /dev/null -w \"GET / -> %{http_code}\\\\n\" http://127.0.0.1:3300/)",
+      "Bash(curl -s http://127.0.0.1:3300/api/list -w \"\\\\nGET /api/list -> %{http_code}\\\\n\")",
+      "Bash(curl -s -X POST -H \"Content-Type: application/json\" --data '{\"text\":\"smoke3\"}' http://127.0.0.1:3300/api/add -w \"\\\\nPOST /api/add -> %{http_code}\\\\n\")"
     ]
   }
 }

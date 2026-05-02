@@ -3,12 +3,25 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "bun run server.ts"
+    "dev": "concurrently -n server,client -c blue,magenta \"bun run dev:server\" \"bun run dev:client\"",
+    "dev:server": "bun --watch run src/server/index.ts",
+    "dev:client": "vite",
+    "build": "vite build",
+    "start": "bun run src/server/index.ts"
   },
   "dependencies": {
-    "elysia": "^1"
+    "@elysiajs/eden": "^1",
+    "@elysiajs/static": "^1",
+    "elysia": "^1",
+    "solid-js": "^1.9.0"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0"
+    "@tailwindcss/vite": "^4",
+    "@types/node": "^25.6.0",
+    "concurrently": "^9",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vite": "^7",
+    "vite-plugin-solid": "^2.11.0"
   }
 }

@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  --animate-flash: flash 2.5s ease-out forwards;
+}
+
+@keyframes flash {
+  0% {
+    background-color: #fde68a;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
