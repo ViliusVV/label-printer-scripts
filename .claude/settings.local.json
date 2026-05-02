@@ -11,7 +11,16 @@
       "Bash(md5sum tests/golden/*.png)",
       "Read(//tmp/**)",
       "Bash(git mv *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(bun *)",
+      "PowerShell(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.PrefixOrigin -eq 'Dhcp' -or $_.IPAddress -match '^192\\\\.168\\\\.|^10\\\\.|^172\\\\.\\(1[6-9]|2[0-9]|3[01]\\)\\\\.' } | Select-Object IPAddress, InterfaceAlias | Format-Table -AutoSize)",
+      "Bash(curl -s -o NUL -w \"GET / -> %{http_code}\\\\n\" http://127.0.0.1:3000/)",
+      "Bash(curl -s -X POST -H \"Content-Type: text/plain\" --data \"smoke-test-entry\" http://127.0.0.1:3000/add)",
+      "Bash(curl -s http://127.0.0.1:3000/list)",
+      "Bash(curl -s -o /dev/null -w \"GET / -> %{http_code}\\\\n\" http://127.0.0.1:3000/)",
+      "Bash(curl -s -X POST -H \"Content-Type: text/plain\" --data \"smoke-test-entry\" -o /dev/null -w \"POST /add -> %{http_code}\\\\n\" http://127.0.0.1:3000/add)",
+      "Bash(curl -s -w \"\\\\nGET /list -> %{http_code}\\\\n\" http://127.0.0.1:3000/list)",
+      "Bash(curl -s -X POST -H \"Content-Type: text/plain\" --data \"smoke2\" -o /dev/null -w \"POST -> %{http_code}\\\\n\" http://127.0.0.1:3000/add)"
     ]
   }
 }
