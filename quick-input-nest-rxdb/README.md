@@ -1,14 +1,14 @@
 # quick-input-nest-rxdb
 
-NestJS + Solid rewrite of the quick input app using **RxDB** on the client and shared types reused by both frontend and backend.
+NestJS + Solid rewrite of the quick input app using **RxDB** on the client, **TanStack Router** for tabbed routes, and shared types reused by both frontend and backend.
 
 ## Stack
 
 - **Backend:** NestJS on Bun
-- **Frontend:** Solid + Vite
+- **Frontend:** Solid + Vite + TanStack Router
 - **Client state:** RxDB
-- **Shared contracts:** `src/shared/inputs.ts`
-- **Storage:** append-only text file at `../data/inputs.txt`
+- **Shared contracts:** `src/shared/contracts.ts`
+- **Storage:** `inputs.txt`, `todo.json`, and `general_db.json`
 
 ## Commands
 
@@ -35,7 +35,8 @@ bun run e2e
 
 - The server listens on port `3300` by default.
 - The Vite dev server proxies `/api` to the Nest backend.
-- The client stores the visible list in an RxDB collection and refreshes it from the backend.
-- `bun run e2e` builds the client first, then validates static serving and REST input flows using a temporary inputs file.
-- Override the storage file with `INPUTS_FILE` and the port with `PORT` if needed.
+- The client stores five routed entity tabs in RxDB collections: Inputs, Todos, Notes, Bookmarks, and Contacts.
+- The app demonstrates three sync-source styles: a text file (`inputs.txt`), a dedicated JSON file (`todo.json`), and several collections sharing one JSON database (`general_db.json`).
+- `bun run e2e` builds the client first, then validates static serving and REST CRUD flows using temporary inputs, todo, and general-db files.
+- Override the storage files with `INPUTS_FILE`, `TODOS_FILE`, `GENERAL_DB_FILE`, and the port with `PORT` if needed.
 

@@ -4,7 +4,7 @@ import {
   deleteInputBodySchema,
   type InputItem,
   type OkResponse,
-} from "../../shared/inputs";
+} from "../../shared/contracts";
 import { InputStorageService } from "./input-storage.service";
 
 @Controller("api/inputs")

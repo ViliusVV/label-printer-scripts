@@ -13,6 +13,7 @@
     "e2e": "bun run build; bun run scripts/e2e.ts"
   },
   "dependencies": {
+    "@tanstack/solid-router": "^1.120.5",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",

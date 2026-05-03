@@ -5,7 +5,7 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dir, "..", "..");
 
 export const HOST = process.env.HOST ?? "0.0.0.0";
-export const PORT = Number.parseInt(process.env.PORT ?? "3300", 10);
+export const PORT = Number.parseInt(process.env.PORT ?? "3333", 10);
 export const MAX_ITEMS = Number.parseInt(process.env.MAX_ITEMS ?? "10", 10);
 export const INPUTS_FILE = process.env.INPUTS_FILE ?? resolve(projectRoot, "..", "data", "inputs.txt");
 export const CLIENT_DIR = resolve(projectRoot, "dist", "client");

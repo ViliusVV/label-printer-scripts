@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { appendFile, readFile, writeFile } from "node:fs/promises";
-import { type InputItem, toInputItem } from "../../shared/inputs";
+import { type InputItem, toInputItem } from "../../shared/contracts";
 import { INPUTS_FILE_PATH, INPUTS_MAX_ITEMS } from "./inputs.constants";
 
 @Injectable()
@@ -20,7 +20,10 @@ export class InputStorageService {
   }
 
   private static toIndexedItems(lines: string[]): InputItem[] {
-    return lines.map((line, index) => ({ line: line.trim(), index })).filter((item) => item.line.length > 0).map((item) => toInputItem(item.index, item.line));
+    return lines
+      .map((line, index) => ({ line: line.trim(), index }))
+      .filter((item) => item.line.length > 0)
+      .map((item) => toInputItem(item.index, item.line));
   }
 
   private async writeRawLines(lines: string[]): Promise<void> {

@@ -5,7 +5,7 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import { existsSync } from "node:fs";
 import type { Request, Response } from "express";
 import { AppModule } from "./app.module";
-import { CLIENT_ASSETS_DIR, HOST, INDEX_HTML, INPUTS_FILE, PORT } from "./config";
+import { CLIENT_ASSETS_DIR, GENERAL_DB_FILE, HOST, INDEX_HTML, INPUTS_FILE, PORT, TODOS_FILE } from "./config";
 
 const log = new Logger("QuickInputNestRxdb");
 
@@ -38,7 +38,9 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
   expressApp.get(/^\/(?!api(?:\/|$)|assets(?:\/|$)).*/, sendClient);
 
   await app.listen(port, host);
-  log.log(`Quick Input Nest RxDB listening on http://${host}:${port} -> writing to ${INPUTS_FILE}`);
+  log.log(
+    `Quick Input Nest RxDB listening on http://${host}:${port} -> inputs=${INPUTS_FILE}, todos=${TODOS_FILE}, general=${GENERAL_DB_FILE}`,
+  );
   return app;
 }
 

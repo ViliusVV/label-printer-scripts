@@ -1,0 +1,2 @@
+export const GENERAL_DB_FILE_PATH = Symbol("GENERAL_DB_FILE_PATH");
+
