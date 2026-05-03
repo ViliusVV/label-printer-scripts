@@ -47,14 +47,21 @@ export class GeneralDbService {
 
   async createNote(body: CreateNoteBody): Promise<NoteItem> {
     const db = await this.readDb();
-    const now = nowIso();
+    if (body.id) {
+      const existing = db.notes.find((item) => item.id === body.id);
+      if (existing) {
+        return existing;
+      }
+    }
+    const createdAt = body.createdAt ?? nowIso();
+    const updatedAt = body.updatedAt ?? createdAt;
     const item: NoteItem = {
-      id: createId("note"),
+      id: body.id ?? createId("note"),
       name: body.name.trim(),
       body: body.body,
       color: body.color,
-      createdAt: now,
-      updatedAt: now,
+      createdAt,
+      updatedAt,
     };
     db.notes.push(item);
     await this.writeDb(db);
@@ -70,7 +77,7 @@ export class GeneralDbService {
       name: body.name.trim(),
       body: body.body,
       color: body.color,
-      updatedAt: nowIso(),
+      updatedAt: body.updatedAt ?? nowIso(),
     };
     db.notes[index] = updated;
     await this.writeDb(db);
@@ -93,14 +100,21 @@ export class GeneralDbService {
 
   async createBookmark(body: CreateBookmarkBody): Promise<BookmarkItem> {
     const db = await this.readDb();
-    const now = nowIso();
+    if (body.id) {
+      const existing = db.bookmarks.find((item) => item.id === body.id);
+      if (existing) {
+        return existing;
+      }
+    }
+    const createdAt = body.createdAt ?? nowIso();
+    const updatedAt = body.updatedAt ?? createdAt;
     const item: BookmarkItem = {
-      id: createId("bookmark"),
+      id: body.id ?? createId("bookmark"),
       name: body.name.trim(),
       url: body.url,
       category: body.category,
-      createdAt: now,
-      updatedAt: now,
+      createdAt,
+      updatedAt,
     };
     db.bookmarks.push(item);
     await this.writeDb(db);
@@ -116,7 +130,7 @@ export class GeneralDbService {
       name: body.name.trim(),
       url: body.url,
       category: body.category,
-      updatedAt: nowIso(),
+      updatedAt: body.updatedAt ?? nowIso(),
     };
     db.bookmarks[index] = updated;
     await this.writeDb(db);
@@ -139,14 +153,21 @@ export class GeneralDbService {
 
   async createContact(body: CreateContactBody): Promise<ContactItem> {
     const db = await this.readDb();
-    const now = nowIso();
+    if (body.id) {
+      const existing = db.contacts.find((item) => item.id === body.id);
+      if (existing) {
+        return existing;
+      }
+    }
+    const createdAt = body.createdAt ?? nowIso();
+    const updatedAt = body.updatedAt ?? createdAt;
     const item: ContactItem = {
-      id: createId("contact"),
+      id: body.id ?? createId("contact"),
       name: body.name.trim(),
       email: body.email,
       company: body.company,
-      createdAt: now,
-      updatedAt: now,
+      createdAt,
+      updatedAt,
     };
     db.contacts.push(item);
     await this.writeDb(db);
@@ -162,7 +183,7 @@ export class GeneralDbService {
       name: body.name.trim(),
       email: body.email,
       company: body.company,
-      updatedAt: nowIso(),
+      updatedAt: body.updatedAt ?? nowIso(),
     };
     db.contacts[index] = updated;
     await this.writeDb(db);

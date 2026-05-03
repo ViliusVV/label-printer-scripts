@@ -28,14 +28,22 @@ export class TodosService {
 
   async create(body: CreateTodoBody): Promise<TodoItem> {
     const todos = await this.readTodos();
-    const now = nowIso();
+    if (body.id) {
+      const existing = todos.find((todo) => todo.id === body.id);
+      if (existing) {
+        return existing;
+      }
+    }
+
+    const createdAt = body.createdAt ?? nowIso();
+    const updatedAt = body.updatedAt ?? createdAt;
     const todo: TodoItem = {
-      id: createId("todo"),
+      id: body.id ?? createId("todo"),
       title: body.title.trim(),
       details: body.details,
       state: body.state,
-      createdAt: now,
-      updatedAt: now,
+      createdAt,
+      updatedAt,
     };
     todos.push(todo);
     await this.writeTodos(todos);
@@ -54,7 +62,7 @@ export class TodosService {
       title: body.title.trim(),
       details: body.details,
       state: body.state,
-      updatedAt: nowIso(),
+      updatedAt: body.updatedAt ?? nowIso(),
     };
     todos[index] = updated;
     await this.writeTodos(todos);

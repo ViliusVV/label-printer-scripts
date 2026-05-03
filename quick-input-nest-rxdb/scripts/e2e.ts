@@ -30,6 +30,13 @@ try {
   const root = await request(app.getHttpServer()).get("/");
   assert(root.status === 200, `Expected root route to succeed, got ${root.status}`);
   assert(root.text.includes("<div id=\"root\"></div>"), "Expected built client index.html");
+  assert(root.text.includes("manifest.webmanifest"), "Expected built client html to reference the PWA manifest");
+
+  const manifest = await request(app.getHttpServer()).get("/manifest.webmanifest");
+  assert(manifest.status === 200, `Expected manifest to be served, got ${manifest.status}`);
+
+  const serviceWorker = await request(app.getHttpServer()).get("/sw.js");
+  assert(serviceWorker.status === 200, `Expected service worker asset to be served, got ${serviceWorker.status}`);
 
   const add = await request(app.getHttpServer()).post("/api/inputs/add").send({ text: "nest-rxdb-e2e-entry" });
   assert(add.status === 201 || add.status === 200, `Expected add to succeed, got ${add.status}`);
@@ -47,16 +54,26 @@ try {
   const remove = await request(app.getHttpServer()).post("/api/inputs/delete").send({ index: created.index });
   assert(remove.status === 201 || remove.status === 200, `Expected delete to succeed, got ${remove.status}`);
 
+  const queuedTodoId = "todo_e2e_client_generated";
+  const queuedTimestamp = "2026-05-03T12:00:00.000Z";
   const createTodo = await request(app.getHttpServer())
     .post("/api/todos/create")
-    .send({ title: "Write docs", details: "Document sync sources", state: "Created" });
+    .send({
+      id: queuedTodoId,
+      title: "Write docs",
+      details: "Document sync sources",
+      state: "Created",
+      createdAt: queuedTimestamp,
+      updatedAt: queuedTimestamp,
+    });
   assert(createTodo.status === 201 || createTodo.status === 200, `Expected todo create to succeed, got ${createTodo.status}`);
   const todoId = createTodo.body.id as string | undefined;
   assert(Boolean(todoId), "Expected created todo id");
+  assert(todoId === queuedTodoId, "Expected server to preserve client-generated todo id");
 
   const updateTodo = await request(app.getHttpServer())
     .post("/api/todos/update")
-    .send({ id: todoId, title: "Write docs", details: "Document sync sources", state: "Done" });
+    .send({ id: todoId, title: "Write docs", details: "Document sync sources", state: "Done", updatedAt: "2026-05-03T12:05:00.000Z" });
   assert(updateTodo.status === 201 || updateTodo.status === 200, `Expected todo update to succeed, got ${updateTodo.status}`);
 
   const todoList = await request(app.getHttpServer()).get("/api/todos/list");

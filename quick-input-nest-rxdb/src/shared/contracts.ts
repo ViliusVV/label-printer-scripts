@@ -33,15 +33,19 @@ export const todoItemSchema = z.object({
 });
 export const todoListSchema = z.array(todoItemSchema);
 export const createTodoBodySchema = z.object({
+  id: z.string().optional(),
   title: z.string().min(1),
   details: z.string(),
   state: todoStateSchema,
+  createdAt: isoDateString.optional(),
+  updatedAt: isoDateString.optional(),
 });
 export const updateTodoBodySchema = z.object({
   id: z.string(),
   title: z.string().min(1),
   details: z.string(),
   state: todoStateSchema,
+  updatedAt: isoDateString.optional(),
 });
 export const deleteByIdBodySchema = z.object({ id: z.string() });
 export type TodoState = z.infer<typeof todoStateSchema>;
@@ -63,11 +67,14 @@ export const noteItemSchema = namedEntityBaseSchema.extend({
 });
 export const noteListSchema = z.array(noteItemSchema);
 export const createNoteBodySchema = z.object({
+  id: z.string().optional(),
   name: z.string().min(1),
   body: z.string(),
   color: z.string().min(1),
+  createdAt: isoDateString.optional(),
+  updatedAt: isoDateString.optional(),
 });
-export const updateNoteBodySchema = createNoteBodySchema.extend({ id: z.string() });
+export const updateNoteBodySchema = createNoteBodySchema.extend({ id: z.string(), updatedAt: isoDateString.optional() });
 export type NoteItem = z.infer<typeof noteItemSchema>;
 export type CreateNoteBody = z.infer<typeof createNoteBodySchema>;
 export type UpdateNoteBody = z.infer<typeof updateNoteBodySchema>;
@@ -78,11 +85,14 @@ export const bookmarkItemSchema = namedEntityBaseSchema.extend({
 });
 export const bookmarkListSchema = z.array(bookmarkItemSchema);
 export const createBookmarkBodySchema = z.object({
+  id: z.string().optional(),
   name: z.string().min(1),
   url: z.string().url(),
   category: z.string(),
+  createdAt: isoDateString.optional(),
+  updatedAt: isoDateString.optional(),
 });
-export const updateBookmarkBodySchema = createBookmarkBodySchema.extend({ id: z.string() });
+export const updateBookmarkBodySchema = createBookmarkBodySchema.extend({ id: z.string(), updatedAt: isoDateString.optional() });
 export type BookmarkItem = z.infer<typeof bookmarkItemSchema>;
 export type CreateBookmarkBody = z.infer<typeof createBookmarkBodySchema>;
 export type UpdateBookmarkBody = z.infer<typeof updateBookmarkBodySchema>;
@@ -93,11 +103,14 @@ export const contactItemSchema = namedEntityBaseSchema.extend({
 });
 export const contactListSchema = z.array(contactItemSchema);
 export const createContactBodySchema = z.object({
+  id: z.string().optional(),
   name: z.string().min(1),
   email: z.string().email(),
   company: z.string(),
+  createdAt: isoDateString.optional(),
+  updatedAt: isoDateString.optional(),
 });
-export const updateContactBodySchema = createContactBodySchema.extend({ id: z.string() });
+export const updateContactBodySchema = createContactBodySchema.extend({ id: z.string(), updatedAt: isoDateString.optional() });
 export type ContactItem = z.infer<typeof contactItemSchema>;
 export type CreateContactBody = z.infer<typeof createContactBodySchema>;
 export type UpdateContactBody = z.infer<typeof updateContactBodySchema>;
