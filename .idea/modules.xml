@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/label-printer.iml" filepath="$PROJECT_DIR$/.idea/label-printer.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/label-printer@1.iml" filepath="$PROJECT_DIR$/.idea/label-printer@1.iml" />
     </modules>
   </component>
 </project>
