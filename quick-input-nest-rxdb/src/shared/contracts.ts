@@ -115,6 +115,56 @@ export type ContactItem = z.infer<typeof contactItemSchema>;
 export type CreateContactBody = z.infer<typeof createContactBodySchema>;
 export type UpdateContactBody = z.infer<typeof updateContactBodySchema>;
 
+export const jsonEntityKeySchema = z.enum(["todos", "notes", "bookmarks", "contacts"]);
+export type JsonEntityKey = z.infer<typeof jsonEntityKeySchema>;
+
+export type JsonEntityMap = {
+  todos: TodoItem;
+  notes: NoteItem;
+  bookmarks: BookmarkItem;
+  contacts: ContactItem;
+};
+
+const buildPullResponseSchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
+  z.object({ items: z.array(itemSchema) });
+
+const buildPushBodySchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
+  z.object({
+    mutations: z.array(
+      z.discriminatedUnion("op", [
+        z.object({ op: z.literal("upsert"), doc: itemSchema }),
+        z.object({ op: z.literal("delete"), id: z.string() }),
+      ]),
+    ),
+  });
+
+export const jsonPullBodySchema = z.object({});
+
+export const jsonEntityItemSchemas = {
+  todos: todoItemSchema,
+  notes: noteItemSchema,
+  bookmarks: bookmarkItemSchema,
+  contacts: contactItemSchema,
+} as const;
+
+export const jsonEntityPullResponseSchemas = {
+  todos: buildPullResponseSchema(todoItemSchema),
+  notes: buildPullResponseSchema(noteItemSchema),
+  bookmarks: buildPullResponseSchema(bookmarkItemSchema),
+  contacts: buildPullResponseSchema(contactItemSchema),
+} as const;
+
+export const jsonEntityPushBodySchemas = {
+  todos: buildPushBodySchema(todoItemSchema),
+  notes: buildPushBodySchema(noteItemSchema),
+  bookmarks: buildPushBodySchema(bookmarkItemSchema),
+  contacts: buildPushBodySchema(contactItemSchema),
+} as const;
+
+export type JsonPullResponse<K extends JsonEntityKey> = z.infer<(typeof jsonEntityPullResponseSchemas)[K]>;
+export type JsonPushBody<K extends JsonEntityKey> = z.infer<(typeof jsonEntityPushBodySchemas)[K]>;
+export type JsonPushMutation<K extends JsonEntityKey> = JsonPushBody<K>["mutations"][number];
+
 const baseRxDocSchema = {
   version: 0,
   primaryKey: "id",
@@ -197,6 +247,8 @@ export const entityTabs = [
   { key: "bookmarks", label: "Bookmarks", path: "/bookmarks", source: "shared-json-file" as const, description: "CRUD documents stored inside the shared data/general_db.json source." },
   { key: "contacts", label: "Contacts", path: "/contacts", source: "shared-json-file" as const, description: "CRUD documents stored inside the shared data/general_db.json source." },
 ] as const;
+
+export type RouteKeys = typeof entityTabs[number]["key"];
 
 export const nowIso = (): string => new Date().toISOString();
 export const createId = (prefix: string): string => `${prefix}_${crypto.randomUUID()}`;

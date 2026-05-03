@@ -38,7 +38,7 @@ bun run e2e
 - The app is installable as a PWA and ships a generated manifest + service worker.
 - The client stores five routed entity tabs in RxDB collections: Inputs, Todos, Notes, Bookmarks, and Contacts.
 - The app demonstrates three sync-source styles: a text file (`inputs.txt`), a dedicated JSON file (`todo.json`), and several collections sharing one JSON database (`general_db.json`).
-- Todos, Notes, Bookmarks, and Contacts now use a local-first optimistic mutation outbox that replays on reconnect; this is the first step toward full replication.
+- Todos, Notes, Bookmarks, and Contacts now use shared generic `pull` / `push` replication contracts under `/api/replication/:entity/*` plus a local-first optimistic mutation outbox that replays on reconnect.
 - Inputs still use the original server-first text-file flow because the current line-index API is not yet a good fit for offline mutation replay.
 - `bun run e2e` builds the client first, then validates static serving and REST CRUD flows using temporary inputs, todo, and general-db files.
 - Override the storage files with `INPUTS_FILE`, `TODOS_FILE`, `GENERAL_DB_FILE`, and the port with `PORT` if needed.

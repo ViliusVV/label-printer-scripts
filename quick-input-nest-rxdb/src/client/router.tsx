@@ -5,40 +5,26 @@ import { ContactsPage } from "./pages/contacts";
 import { InputsPage } from "./pages/inputs";
 import { NotesPage } from "./pages/notes";
 import { TodosPage } from "./pages/todos";
+import {entityTabs, RouteKeys} from "../shared/contracts";
+import {JSX} from "solid-js";
 
 const rootRoute = createRootRoute({
   component: App,
 });
 
-const inputsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/",
-  component: InputsPage,
-});
+const inputsRoute = createRouteHelper("inputs", InputsPage);
+const todosRoute = createRouteHelper("todos", TodosPage);
+const notesRoute = createRouteHelper("notes", NotesPage);
+const bookmarksRoute = createRouteHelper("bookmarks", BookmarksPage);
+const contactsRoute = createRouteHelper("contacts", ContactsPage);
 
-const todosRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/todos",
-  component: TodosPage,
-});
-
-const notesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/notes",
-  component: NotesPage,
-});
-
-const bookmarksRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/bookmarks",
-  component: BookmarksPage,
-});
-
-const contactsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/contacts",
-  component: ContactsPage,
-});
+function createRouteHelper(routeKey: RouteKeys, component: () => JSX.Element) {
+  return createRoute({
+    getParentRoute: () => rootRoute,
+    path: entityTabs.find((tab) => tab.key === routeKey)?.path ?? "/",
+    component: component
+  });
+}
 
 const routeTree = rootRoute.addChildren([inputsRoute, todosRoute, notesRoute, bookmarksRoute, contactsRoute]);
 

@@ -1,12 +1,11 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { BookmarksController } from "../src/server/general-db/bookmarks.controller";
-import { ContactsController } from "../src/server/general-db/contacts.controller";
 import { GeneralDbService } from "../src/server/general-db/general-db.service";
-import { NotesController } from "../src/server/general-db/notes.controller";
 import { InputsController } from "../src/server/inputs/inputs.controller";
 import { InputStorageService } from "../src/server/inputs/input-storage.service";
+import { JsonReplicationController } from "../src/server/replication/json-replication.controller";
+import { JsonReplicationService } from "../src/server/replication/json-replication.service";
 import { TodosController } from "../src/server/todos/todos.controller";
 import { TodosService } from "../src/server/todos/todos.service";
 
@@ -24,11 +23,10 @@ const generalDbFile = join(tempDir, "general_db.json");
 try {
   const inputStorage = new InputStorageService(inputsFile, 10);
   const inputs = new InputsController(inputStorage);
-  const todos = new TodosController(new TodosService(todosFile));
+  const todosService = new TodosService(todosFile);
+  const todos = new TodosController(todosService);
   const generalDb = new GeneralDbService(generalDbFile);
-  const notes = new NotesController(generalDb);
-  const bookmarks = new BookmarksController(generalDb);
-  const contacts = new ContactsController(generalDb);
+  const replication = new JsonReplicationController(new JsonReplicationService(todosService, generalDb));
 
   await inputs.add({ text: "  first  " });
   await inputs.add({ text: "   " });
@@ -56,29 +54,29 @@ try {
   assert(notFound, "Expected missing delete to throw");
 
   const createdTodo = await todos.create({ title: "Ship PWA", details: "Make offline first work", state: "Created" });
-  const updatedTodo = await todos.update({ id: createdTodo.id, title: "Ship PWA", details: "Wire service worker later", state: "InProgress" });
-  assert(updatedTodo.state === "InProgress", "Todo update should change state");
-  assert((await todos.list()).length === 1, "Expected a todo to be listed");
-  await todos.delete({ id: createdTodo.id });
-  assert((await todos.list()).length === 0, "Expected todo deletion to empty the list");
+  await replication.push("todos", { mutations: [{ op: "upsert", doc: { ...createdTodo, state: "InProgress" as const } }] });
+  const todoPull = (await replication.pull("todos", {})) as { items: Array<{ state: string }> };
+  assert(todoPull.items[0]?.state === "InProgress", "Todo push upsert should change state");
+  await replication.push("todos", { mutations: [{ op: "delete", id: createdTodo.id }] });
+  assert(((await replication.pull("todos", {})) as { items: unknown[] }).items.length === 0, "Expected todo delete mutation to empty the list");
 
-  const createdNote = await notes.create({ name: "Idea", body: "Use one shared json file", color: "violet" });
-  const updatedNote = await notes.update({ id: createdNote.id, name: "Idea", body: "Updated body", color: "violet" });
-  assert(updatedNote.body === "Updated body", "Note update should persist");
-  await notes.delete({ id: createdNote.id });
-  assert((await notes.list()).length === 0, "Expected note deletion to empty the list");
+  await replication.push("notes", { mutations: [{ op: "upsert", doc: { id: "note_1", name: "Idea", body: "Shared general db", color: "violet", createdAt: "2026-05-03T12:00:00.000Z", updatedAt: "2026-05-03T12:00:00.000Z" } }] });
+  await replication.push("notes", { mutations: [{ op: "upsert", doc: { id: "note_1", name: "Idea", body: "Updated body", color: "violet", createdAt: "2026-05-03T12:00:00.000Z", updatedAt: "2026-05-03T12:05:00.000Z" } }] });
+  assert(((await replication.pull("notes", {})) as { items: Array<{ body: string }> }).items[0]?.body === "Updated body", "Note upsert should persist");
+  await replication.push("notes", { mutations: [{ op: "delete", id: "note_1" }] });
+  assert(((await replication.pull("notes", {})) as { items: unknown[] }).items.length === 0, "Expected note deletion to empty the list");
 
-  const createdBookmark = await bookmarks.create({ name: "RxDB", url: "https://rxdb.info", category: "Docs" });
-  const updatedBookmark = await bookmarks.update({ id: createdBookmark.id, name: "RxDB Docs", url: "https://rxdb.info", category: "Docs" });
-  assert(updatedBookmark.name === "RxDB Docs", "Bookmark update should persist");
-  await bookmarks.delete({ id: createdBookmark.id });
-  assert((await bookmarks.list()).length === 0, "Expected bookmark deletion to empty the list");
+  await replication.push("bookmarks", { mutations: [{ op: "upsert", doc: { id: "bookmark_1", name: "RxDB", url: "https://rxdb.info", category: "Docs", createdAt: "2026-05-03T12:00:00.000Z", updatedAt: "2026-05-03T12:00:00.000Z" } }] });
+  await replication.push("bookmarks", { mutations: [{ op: "upsert", doc: { id: "bookmark_1", name: "RxDB Docs", url: "https://rxdb.info", category: "Docs", createdAt: "2026-05-03T12:00:00.000Z", updatedAt: "2026-05-03T12:05:00.000Z" } }] });
+  assert(((await replication.pull("bookmarks", {})) as { items: Array<{ name: string }> }).items[0]?.name === "RxDB Docs", "Bookmark upsert should persist");
+  await replication.push("bookmarks", { mutations: [{ op: "delete", id: "bookmark_1" }] });
+  assert(((await replication.pull("bookmarks", {})) as { items: unknown[] }).items.length === 0, "Expected bookmark deletion to empty the list");
 
-  const createdContact = await contacts.create({ name: "Vilius", email: "vilius@example.com", company: "Label Printer" });
-  const updatedContact = await contacts.update({ id: createdContact.id, name: "Vilius L.", email: "vilius@example.com", company: "Label Printer" });
-  assert(updatedContact.name === "Vilius L.", "Contact update should persist");
-  await contacts.delete({ id: createdContact.id });
-  assert((await contacts.list()).length === 0, "Expected contact deletion to empty the list");
+  await replication.push("contacts", { mutations: [{ op: "upsert", doc: { id: "contact_1", name: "Vilius", email: "vilius@example.com", company: "Label Printer", createdAt: "2026-05-03T12:00:00.000Z", updatedAt: "2026-05-03T12:00:00.000Z" } }] });
+  await replication.push("contacts", { mutations: [{ op: "upsert", doc: { id: "contact_1", name: "Vilius L.", email: "vilius@example.com", company: "Label Printer", createdAt: "2026-05-03T12:00:00.000Z", updatedAt: "2026-05-03T12:05:00.000Z" } }] });
+  assert(((await replication.pull("contacts", {})) as { items: Array<{ name: string }> }).items[0]?.name === "Vilius L.", "Contact upsert should persist");
+  await replication.push("contacts", { mutations: [{ op: "delete", id: "contact_1" }] });
+  assert(((await replication.pull("contacts", {})) as { items: unknown[] }).items.length === 0, "Expected contact deletion to empty the list");
 
   console.log("Smoke test passed");
 } finally {

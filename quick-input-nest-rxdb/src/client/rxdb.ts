@@ -2,24 +2,10 @@ import { createRxDatabase, type RxCollection, type RxDatabase } from "rxdb";
 import { getRxStorageDexie } from "rxdb/plugins/storage-dexie";
 import {
   addInput,
-  createBookmark,
-  createContact,
-  createNote,
-  createTodo,
-  deleteBookmark,
-  deleteContact,
   deleteInput,
-  deleteNote,
-  deleteTodo,
-  listBookmarks,
-  listContacts,
   listInputs,
-  listNotes,
-  listTodos,
-  updateBookmark,
-  updateContact,
-  updateNote,
-  updateTodo,
+  pullJsonEntity,
+  pushJsonEntity,
 } from "./api";
 import {
   bookmarkCollectionSchema,
@@ -32,6 +18,8 @@ import {
   type CreateTodoBody,
   inputCollectionSchema,
   type InputItem,
+  type JsonEntityKey,
+  type JsonPushMutation,
   noteCollectionSchema,
   type NoteItem,
   todoCollectionSchema,
@@ -45,8 +33,8 @@ import {
 } from "../shared/contracts";
 
 type SortSpec = Array<Record<string, "asc" | "desc">>;
-type CrudEntityKey = "todos" | "notes" | "bookmarks" | "contacts";
-type MutationAction = "create" | "update" | "delete";
+type CrudEntityKey = JsonEntityKey;
+type MutationAction = JsonPushMutation<JsonEntityKey>["op"];
 
 type SyncState = {
   online: boolean;
@@ -82,18 +70,11 @@ type CollectionMap = {
   contacts: ContactItem;
 };
 
-type CrudCreateBodyMap = {
-  todos: CreateTodoBody;
-  notes: CreateNoteBody;
-  bookmarks: CreateBookmarkBody;
-  contacts: CreateContactBody;
-};
-
-type CrudUpdateBodyMap = {
-  todos: UpdateTodoBody;
-  notes: UpdateNoteBody;
-  bookmarks: UpdateBookmarkBody;
-  contacts: UpdateContactBody;
+type CrudItemMap = {
+  todos: TodoItem;
+  notes: NoteItem;
+  bookmarks: BookmarkItem;
+  contacts: ContactItem;
 };
 
 const outboxCollectionSchema = {
@@ -104,7 +85,7 @@ const outboxCollectionSchema = {
   properties: {
     id: { type: "string", maxLength: 128 },
     entity: { type: "string", enum: ["todos", "notes", "bookmarks", "contacts"] },
-    action: { type: "string", enum: ["create", "update", "delete"] },
+    action: { type: "string", enum: ["upsert", "delete"] },
     payloadJson: { type: "string" },
     enqueuedAt: { type: "string", format: "date-time" },
     attempts: { type: "number", minimum: 0, multipleOf: 1 },
@@ -190,7 +171,7 @@ const refreshPendingCount = async (): Promise<void> => {
 const enqueueMutation = async <K extends CrudEntityKey>(
   entity: K,
   action: MutationAction,
-  payload: CrudCreateBodyMap[K] | CrudUpdateBodyMap[K] | { id: string },
+  payload: JsonPushMutation<JsonEntityKey>,
 ): Promise<void> => {
   const outbox = await getOutboxCollection();
   await outbox.insert({
@@ -214,6 +195,13 @@ const getPendingMutations = async (entity?: CrudEntityKey): Promise<OutboxMutati
 const hasPendingMutations = async (entity: CrudEntityKey): Promise<boolean> => {
   const pending = await getPendingMutations(entity);
   return pending.length > 0;
+};
+
+const replicationSorts: Record<CrudEntityKey, SortSpec> = {
+  todos: [{ updatedAt: "desc" }],
+  notes: [{ updatedAt: "desc" }],
+  bookmarks: [{ updatedAt: "desc" }],
+  contacts: [{ updatedAt: "desc" }],
 };
 
 const replaceCollection = async <K extends keyof CollectionMap>(name: K, items: CollectionMap[K][]): Promise<void> => {
@@ -299,9 +287,6 @@ const createCrudEntityHelpers = <K extends keyof CollectionMap, CreateBody, Upda
   name: Extract<K, CrudEntityKey>;
   sync: () => Promise<CollectionMap[K][]>;
   watch: (onItems: (items: CollectionMap[K][]) => void) => Promise<() => void>;
-  create: (body: CreateBody) => Promise<unknown>;
-  update: (body: UpdateBody) => Promise<unknown>;
-  remove: (id: string) => Promise<void>;
   createDraft: (body: CreateBody) => CollectionMap[K] & CreateBody;
   updateDraft: (current: CollectionMap[K], body: UpdateBody) => CollectionMap[K] & UpdateBody;
 }) => ({
@@ -311,7 +296,10 @@ const createCrudEntityHelpers = <K extends keyof CollectionMap, CreateBody, Upda
     const collection = (await getCollection(config.name)) as unknown as RxCollection<Record<string, unknown>>;
     const draft = config.createDraft(body);
     await collection.upsert(draft as Record<string, unknown>);
-    await enqueueMutation(config.name, "create", draft);
+    await enqueueMutation(config.name, "upsert", {
+      op: "upsert",
+      doc: draft as CrudItemMap[Extract<K, CrudEntityKey>],
+    } as unknown as JsonPushMutation<JsonEntityKey>);
     void flushOutbox();
   },
   updateEntry: async (body: UpdateBody): Promise<void> => {
@@ -322,7 +310,10 @@ const createCrudEntityHelpers = <K extends keyof CollectionMap, CreateBody, Upda
     }
     const draft = config.updateDraft(current.toJSON() as CollectionMap[K], body);
     await collection.upsert(draft as Record<string, unknown>);
-    await enqueueMutation(config.name, "update", draft);
+    await enqueueMutation(config.name, "upsert", {
+      op: "upsert",
+      doc: draft as CrudItemMap[Extract<K, CrudEntityKey>],
+    } as unknown as JsonPushMutation<JsonEntityKey>);
     void flushOutbox();
   },
   deleteEntry: async (id: string): Promise<void> => {
@@ -331,7 +322,7 @@ const createCrudEntityHelpers = <K extends keyof CollectionMap, CreateBody, Upda
     if (current) {
       await current.remove();
     }
-    await enqueueMutation(config.name, "delete", { id });
+    await enqueueMutation(config.name, "delete", { op: "delete", id });
     void flushOutbox();
   },
 });
@@ -368,44 +359,8 @@ const watchCollection = async <K extends keyof CollectionMap>(
 };
 
 const dispatchMutation = async (mutation: OutboxMutation): Promise<void> => {
-  const payload = JSON.parse(mutation.payloadJson) as unknown;
-  switch (mutation.entity) {
-    case "todos":
-      if (mutation.action === "create") {
-        await createTodo(payload as CreateTodoBody);
-      } else if (mutation.action === "update") {
-        await updateTodo(payload as UpdateTodoBody);
-      } else {
-        await deleteTodo(payload as { id: string });
-      }
-      return;
-    case "notes":
-      if (mutation.action === "create") {
-        await createNote(payload as CreateNoteBody);
-      } else if (mutation.action === "update") {
-        await updateNote(payload as UpdateNoteBody);
-      } else {
-        await deleteNote(payload as { id: string });
-      }
-      return;
-    case "bookmarks":
-      if (mutation.action === "create") {
-        await createBookmark(payload as CreateBookmarkBody);
-      } else if (mutation.action === "update") {
-        await updateBookmark(payload as UpdateBookmarkBody);
-      } else {
-        await deleteBookmark(payload as { id: string });
-      }
-      return;
-    case "contacts":
-      if (mutation.action === "create") {
-        await createContact(payload as CreateContactBody);
-      } else if (mutation.action === "update") {
-        await updateContact(payload as UpdateContactBody);
-      } else {
-        await deleteContact(payload as { id: string });
-      }
-  }
+  const payload = JSON.parse(mutation.payloadJson) as JsonPushMutation<typeof mutation.entity>;
+  await pushJsonEntity(mutation.entity, [payload]);
 };
 
 const createOfflineTodoDraft = (body: CreateTodoBody): TodoItem & CreateTodoBody => {
@@ -492,10 +447,10 @@ const updateOfflineContactDraft = (current: ContactItem, body: UpdateContactBody
 });
 
 const inputsSync = createSyncHelpers({ name: "inputs", list: listInputs, sort: [{ index: "desc" }] });
-const todosSync = createSyncHelpers({ name: "todos", list: listTodos, sort: [{ updatedAt: "desc" }], isOfflineFirst: true });
-const notesSync = createSyncHelpers({ name: "notes", list: listNotes, sort: [{ updatedAt: "desc" }], isOfflineFirst: true });
-const bookmarksSync = createSyncHelpers({ name: "bookmarks", list: listBookmarks, sort: [{ updatedAt: "desc" }], isOfflineFirst: true });
-const contactsSync = createSyncHelpers({ name: "contacts", list: listContacts, sort: [{ updatedAt: "desc" }], isOfflineFirst: true });
+const todosSync = createSyncHelpers({ name: "todos", list: () => pullJsonEntity("todos"), sort: replicationSorts.todos, isOfflineFirst: true });
+const notesSync = createSyncHelpers({ name: "notes", list: () => pullJsonEntity("notes"), sort: replicationSorts.notes, isOfflineFirst: true });
+const bookmarksSync = createSyncHelpers({ name: "bookmarks", list: () => pullJsonEntity("bookmarks"), sort: replicationSorts.bookmarks, isOfflineFirst: true });
+const contactsSync = createSyncHelpers({ name: "contacts", list: () => pullJsonEntity("contacts"), sort: replicationSorts.contacts, isOfflineFirst: true });
 
 const inputsEntity = createTextEntityHelpers({
   ...inputsSync,
@@ -506,9 +461,6 @@ const inputsEntity = createTextEntityHelpers({
 const todosEntity = createCrudEntityHelpers<"todos", CreateTodoBody, UpdateTodoBody>({
   name: "todos",
   ...todosSync,
-  create: createTodo,
-  update: updateTodo,
-  remove: (id: string) => deleteTodo({ id }),
   createDraft: createOfflineTodoDraft,
   updateDraft: updateOfflineTodoDraft,
 });
@@ -516,9 +468,6 @@ const todosEntity = createCrudEntityHelpers<"todos", CreateTodoBody, UpdateTodoB
 const notesEntity = createCrudEntityHelpers<"notes", CreateNoteBody, UpdateNoteBody>({
   name: "notes",
   ...notesSync,
-  create: createNote,
-  update: updateNote,
-  remove: (id: string) => deleteNote({ id }),
   createDraft: createOfflineNoteDraft,
   updateDraft: updateOfflineNoteDraft,
 });
@@ -526,9 +475,6 @@ const notesEntity = createCrudEntityHelpers<"notes", CreateNoteBody, UpdateNoteB
 const bookmarksEntity = createCrudEntityHelpers<"bookmarks", CreateBookmarkBody, UpdateBookmarkBody>({
   name: "bookmarks",
   ...bookmarksSync,
-  create: createBookmark,
-  update: updateBookmark,
-  remove: (id: string) => deleteBookmark({ id }),
   createDraft: createOfflineBookmarkDraft,
   updateDraft: updateOfflineBookmarkDraft,
 });
@@ -536,9 +482,6 @@ const bookmarksEntity = createCrudEntityHelpers<"bookmarks", CreateBookmarkBody,
 const contactsEntity = createCrudEntityHelpers<"contacts", CreateContactBody, UpdateContactBody>({
   name: "contacts",
   ...contactsSync,
-  create: createContact,
-  update: updateContact,
-  remove: (id: string) => deleteContact({ id }),
   createDraft: createOfflineContactDraft,
   updateDraft: updateOfflineContactDraft,
 });

@@ -57,53 +57,75 @@ try {
   const queuedTodoId = "todo_e2e_client_generated";
   const queuedTimestamp = "2026-05-03T12:00:00.000Z";
   const createTodo = await request(app.getHttpServer())
-    .post("/api/todos/create")
+    .post("/api/replication/todos/push")
     .send({
-      id: queuedTodoId,
-      title: "Write docs",
-      details: "Document sync sources",
-      state: "Created",
-      createdAt: queuedTimestamp,
-      updatedAt: queuedTimestamp,
+      mutations: [
+        {
+          op: "upsert",
+          doc: {
+            id: queuedTodoId,
+            title: "Write docs",
+            details: "Document sync sources",
+            state: "Created",
+            createdAt: queuedTimestamp,
+            updatedAt: queuedTimestamp,
+          },
+        },
+      ],
     });
   assert(createTodo.status === 201 || createTodo.status === 200, `Expected todo create to succeed, got ${createTodo.status}`);
-  const todoId = createTodo.body.id as string | undefined;
-  assert(Boolean(todoId), "Expected created todo id");
-  assert(todoId === queuedTodoId, "Expected server to preserve client-generated todo id");
+  const todoId = queuedTodoId;
 
   const updateTodo = await request(app.getHttpServer())
-    .post("/api/todos/update")
-    .send({ id: todoId, title: "Write docs", details: "Document sync sources", state: "Done", updatedAt: "2026-05-03T12:05:00.000Z" });
+    .post("/api/replication/todos/push")
+    .send({
+      mutations: [
+        {
+          op: "upsert",
+          doc: {
+            id: todoId,
+            title: "Write docs",
+            details: "Document sync sources",
+            state: "Done",
+            createdAt: queuedTimestamp,
+            updatedAt: "2026-05-03T12:05:00.000Z",
+          },
+        },
+      ],
+    });
   assert(updateTodo.status === 201 || updateTodo.status === 200, `Expected todo update to succeed, got ${updateTodo.status}`);
 
-  const todoList = await request(app.getHttpServer()).get("/api/todos/list");
-  assert(todoList.status === 200, `Expected todo list to succeed, got ${todoList.status}`);
-  assert(todoList.body.some((todo: { id: string; state: string }) => todo.id === todoId && todo.state === "Done"), "Expected updated todo in list output");
+  const todoList = await request(app.getHttpServer()).post("/api/replication/todos/pull").send({});
+  assert(todoList.status === 201 || todoList.status === 200, `Expected todo list to succeed, got ${todoList.status}`);
+  assert(todoList.body.items.some((todo: { id: string; state: string }) => todo.id === todoId && todo.state === "Done"), "Expected updated todo in list output");
 
-  const deleteTodo = await request(app.getHttpServer()).post("/api/todos/delete").send({ id: todoId });
+  const deleteTodo = await request(app.getHttpServer()).post("/api/replication/todos/push").send({ mutations: [{ op: "delete", id: todoId }] });
   assert(deleteTodo.status === 201 || deleteTodo.status === 200, `Expected todo delete to succeed, got ${deleteTodo.status}`);
 
   const createNote = await request(app.getHttpServer())
-    .post("/api/notes/create")
-    .send({ name: "Demo note", body: "Shared general db", color: "green" });
+    .post("/api/replication/notes/push")
+    .send({ mutations: [{ op: "upsert", doc: { id: "note_e2e", name: "Demo note", body: "Shared general db", color: "green", createdAt: queuedTimestamp, updatedAt: queuedTimestamp } }] });
   assert(createNote.status === 201 || createNote.status === 200, `Expected note create to succeed, got ${createNote.status}`);
 
   const createBookmark = await request(app.getHttpServer())
-    .post("/api/bookmarks/create")
-    .send({ name: "Solid", url: "https://www.solidjs.com", category: "Framework" });
+    .post("/api/replication/bookmarks/push")
+    .send({ mutations: [{ op: "upsert", doc: { id: "bookmark_e2e", name: "Solid", url: "https://www.solidjs.com", category: "Framework", createdAt: queuedTimestamp, updatedAt: queuedTimestamp } }] });
   assert(createBookmark.status === 201 || createBookmark.status === 200, `Expected bookmark create to succeed, got ${createBookmark.status}`);
 
   const createContact = await request(app.getHttpServer())
-    .post("/api/contacts/create")
-    .send({ name: "Support", email: "support@example.com", company: "Acme" });
+    .post("/api/replication/contacts/push")
+    .send({ mutations: [{ op: "upsert", doc: { id: "contact_e2e", name: "Support", email: "support@example.com", company: "Acme", createdAt: queuedTimestamp, updatedAt: queuedTimestamp } }] });
   assert(createContact.status === 201 || createContact.status === 200, `Expected contact create to succeed, got ${createContact.status}`);
 
-  const notesList = await request(app.getHttpServer()).get("/api/notes/list");
-  const bookmarksList = await request(app.getHttpServer()).get("/api/bookmarks/list");
-  const contactsList = await request(app.getHttpServer()).get("/api/contacts/list");
-  assert(notesList.body.length === 1, "Expected one note in shared general_db source");
-  assert(bookmarksList.body.length === 1, "Expected one bookmark in shared general_db source");
-  assert(contactsList.body.length === 1, "Expected one contact in shared general_db source");
+  const notesList = await request(app.getHttpServer()).post("/api/replication/notes/pull").send({});
+  const bookmarksList = await request(app.getHttpServer()).post("/api/replication/bookmarks/pull").send({});
+  const contactsList = await request(app.getHttpServer()).post("/api/replication/contacts/pull").send({});
+  assert(notesList.status === 201 || notesList.status === 200, `Expected notes pull to succeed, got ${notesList.status}`);
+  assert(bookmarksList.status === 201 || bookmarksList.status === 200, `Expected bookmarks pull to succeed, got ${bookmarksList.status}`);
+  assert(contactsList.status === 201 || contactsList.status === 200, `Expected contacts pull to succeed, got ${contactsList.status}`);
+  assert(notesList.body.items.length === 1, "Expected one note in shared general_db source");
+  assert(bookmarksList.body.items.length === 1, "Expected one bookmark in shared general_db source");
+  assert(contactsList.body.items.length === 1, "Expected one contact in shared general_db source");
 
   console.log("E2E test passed");
 } finally {

@@ -1,42 +1,18 @@
 import {
   addInputBodySchema,
-  bookmarkListSchema,
-  bookmarkItemSchema,
-  contactListSchema,
-  contactItemSchema,
-  createBookmarkBodySchema,
-  createContactBodySchema,
-  createNoteBodySchema,
-  createTodoBodySchema,
-  deleteByIdBodySchema,
   deleteInputBodySchema,
   errorResponseSchema,
   inputListSchema,
-  noteListSchema,
-  noteItemSchema,
+  jsonEntityPullResponseSchemas,
+  jsonEntityPushBodySchemas,
   okResponseSchema,
-  todoListSchema,
-  todoItemSchema,
-  updateBookmarkBodySchema,
-  updateContactBodySchema,
-  updateNoteBodySchema,
-  updateTodoBodySchema,
   type AddInputBody,
-  type BookmarkItem,
-  type ContactItem,
-  type CreateBookmarkBody,
-  type CreateContactBody,
-  type CreateNoteBody,
-  type CreateTodoBody,
-  type DeleteByIdBody,
   type DeleteInputBody,
   type InputItem,
-  type NoteItem,
-  type TodoItem,
-  type UpdateBookmarkBody,
-  type UpdateContactBody,
-  type UpdateNoteBody,
-  type UpdateTodoBody,
+  type JsonEntityKey,
+  type JsonEntityMap,
+  type JsonPullResponse,
+  type JsonPushMutation,
 } from "../shared/contracts";
 
 type Parser<T> = { parse: (value: unknown) => T };
@@ -46,14 +22,6 @@ type TextCollectionApiConfig<Item, CreateBody, DeleteBody> = {
   listSchema: Parser<Item[]>;
   createSchema: Parser<CreateBody>;
   deleteSchema: Parser<DeleteBody>;
-};
-
-type CrudCollectionApiConfig<Item, CreateBody, UpdateBody> = {
-  basePath: string;
-  listSchema: Parser<Item[]>;
-  itemSchema: Parser<Item>;
-  createSchema: Parser<CreateBody>;
-  updateSchema: Parser<UpdateBody>;
 };
 
 const readErrorMessage = async (response: Response): Promise<string> => {
@@ -68,14 +36,6 @@ const readErrorMessage = async (response: Response): Promise<string> => {
   }
 
   return response.statusText || "Request failed";
-};
-
-const expectOk = async (response: Response) => {
-  if (!response.ok) {
-    throw new Error(await readErrorMessage(response));
-  }
-
-  return okResponseSchema.parse(await response.json());
 };
 
 const getJson = async <T>(url: string, parser: { parse: (value: unknown) => T }): Promise<T> => {
@@ -108,13 +68,6 @@ const createTextCollectionApi = <Item, CreateBody, DeleteBody>(config: TextColle
   delete: (body: DeleteBody) => postJson(`${config.basePath}/delete`, config.deleteSchema.parse(body), okResponseSchema),
 });
 
-const createCrudCollectionApi = <Item, CreateBody, UpdateBody>(config: CrudCollectionApiConfig<Item, CreateBody, UpdateBody>) => ({
-  list: () => getJson(`${config.basePath}/list`, config.listSchema),
-  create: (body: CreateBody) => postJson(`${config.basePath}/create`, config.createSchema.parse(body), config.itemSchema),
-  update: (body: UpdateBody) => postJson(`${config.basePath}/update`, config.updateSchema.parse(body), config.itemSchema),
-  delete: (body: DeleteByIdBody) => postJson(`${config.basePath}/delete`, deleteByIdBodySchema.parse(body), okResponseSchema),
-});
-
 const inputsApi = createTextCollectionApi<InputItem, AddInputBody, DeleteInputBody>({
   basePath: "/api/inputs",
   listSchema: inputListSchema,
@@ -122,37 +75,19 @@ const inputsApi = createTextCollectionApi<InputItem, AddInputBody, DeleteInputBo
   deleteSchema: deleteInputBodySchema,
 });
 
-const todosApi = createCrudCollectionApi<TodoItem, CreateTodoBody, UpdateTodoBody>({
-  basePath: "/api/todos",
-  listSchema: todoListSchema,
-  itemSchema: todoItemSchema,
-  createSchema: createTodoBodySchema,
-  updateSchema: updateTodoBodySchema,
-});
+const pullJsonEntity = async <K extends JsonEntityKey>(entity: K): Promise<JsonEntityMap[K][]> => {
+  const response = await postJson(
+    `/api/replication/${entity}/pull`,
+    {},
+    jsonEntityPullResponseSchemas[entity] as Parser<JsonPullResponse<K>>,
+  );
+  return response.items as JsonEntityMap[K][];
+};
 
-const notesApi = createCrudCollectionApi<NoteItem, CreateNoteBody, UpdateNoteBody>({
-  basePath: "/api/notes",
-  listSchema: noteListSchema,
-  itemSchema: noteItemSchema,
-  createSchema: createNoteBodySchema,
-  updateSchema: updateNoteBodySchema,
-});
-
-const bookmarksApi = createCrudCollectionApi<BookmarkItem, CreateBookmarkBody, UpdateBookmarkBody>({
-  basePath: "/api/bookmarks",
-  listSchema: bookmarkListSchema,
-  itemSchema: bookmarkItemSchema,
-  createSchema: createBookmarkBodySchema,
-  updateSchema: updateBookmarkBodySchema,
-});
-
-const contactsApi = createCrudCollectionApi<ContactItem, CreateContactBody, UpdateContactBody>({
-  basePath: "/api/contacts",
-  listSchema: contactListSchema,
-  itemSchema: contactItemSchema,
-  createSchema: createContactBodySchema,
-  updateSchema: updateContactBodySchema,
-});
+const pushJsonEntity = async <K extends JsonEntityKey>(entity: K, mutations: JsonPushMutation<K>[]): Promise<void> => {
+  const body = jsonEntityPushBodySchemas[entity].parse({ mutations });
+  await postJson(`/api/replication/${entity}/push`, body, okResponseSchema);
+};
 
 export const listInputs = inputsApi.list;
 export const addInput = async (body: AddInputBody): Promise<void> => {
@@ -162,31 +97,5 @@ export const deleteInput = async (body: DeleteInputBody): Promise<void> => {
   await inputsApi.delete(body);
 };
 
-export const listTodos = todosApi.list;
-export const createTodo = todosApi.create;
-export const updateTodo = todosApi.update;
-export const deleteTodo = async (body: DeleteByIdBody): Promise<void> => {
-  await todosApi.delete(body);
-};
-
-export const listNotes = notesApi.list;
-export const createNote = notesApi.create;
-export const updateNote = notesApi.update;
-export const deleteNote = async (body: DeleteByIdBody): Promise<void> => {
-  await notesApi.delete(body);
-};
-
-export const listBookmarks = bookmarksApi.list;
-export const createBookmark = bookmarksApi.create;
-export const updateBookmark = bookmarksApi.update;
-export const deleteBookmark = async (body: DeleteByIdBody): Promise<void> => {
-  await bookmarksApi.delete(body);
-};
-
-export const listContacts = contactsApi.list;
-export const createContact = contactsApi.create;
-export const updateContact = contactsApi.update;
-export const deleteContact = async (body: DeleteByIdBody): Promise<void> => {
-  await contactsApi.delete(body);
-};
+export { pullJsonEntity, pushJsonEntity };
 
