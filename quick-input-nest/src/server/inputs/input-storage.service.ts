@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { appendFile, readFile, writeFile } from "node:fs/promises";
+import { transformInput } from "../../shared/transform";
 import type { InputItem } from "./input.types";
 import { INPUTS_FILE_PATH, INPUTS_MAX_ITEMS } from "./inputs.constants";
 
@@ -38,6 +39,9 @@ export class InputStorageService {
     const trimmed = text.trim();
     if (!trimmed) return;
     await appendFile(this.filePath, `${trimmed}\n`, "utf-8");
+
+    const transformed = transformInput(trimmed);
+    await appendFile("inputs_transformed.txt", `${transformed}\n`, "utf-8");
   }
 
   async listLatest(): Promise<InputItem[]> {

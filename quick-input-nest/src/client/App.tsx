@@ -1,59 +1,61 @@
-import { createResource, createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
+import {createMutation, createQuery, QueryClient, useQueryClient} from "@tanstack/solid-query";
 import type { RouterOutputs } from "../shared/api";
+import { transformInput } from "../shared/transform";
 import { getErrorMessage, trpc } from "./trpc";
 
 type InputEntry = RouterOutputs["inputs"]["list"][number];
 
+const queryClient = new QueryClient();
+
+
 export default function App() {
   const [text, setText] = createSignal("");
   const [highlightFirst, setHighlightFirst] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
-  const [entries, { refetch }] = createResource<InputEntry[]>(async () => {
-    return trpc.inputs.list.query();
-  });
-  const displayEntries = () => entries.latest ?? entries() ?? [];
-  const isInitialLoad = () => entries.loading && entries() === undefined && entries.latest === undefined;
+
+  const entriesQuery = createQuery(() => ({
+    queryKey: ["inputs"],
+    queryFn: () => trpc.inputs.list.query(),
+  }));
+
+  const addMutation = createMutation(() => ({
+    mutationFn: (value: string) => trpc.inputs.add.mutate({ text: value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inputs"] });
+      setHighlightFirst(true);
+      setTimeout(() => setHighlightFirst(false), 2500);
+    },
+  }));
+
+  const deleteMutation = createMutation(() => ({
+    mutationFn: (index: number) => trpc.inputs.delete.mutate({ index }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inputs"] });
+    },
+  }));
+
+  const displayEntries = () => entriesQuery.data ?? [];
 
   let inputRef: HTMLInputElement | undefined;
 
-  const flashNewest = () => {
-    setHighlightFirst(true);
-    setTimeout(() => setHighlightFirst(false), 2500);
-  };
-
-  const refreshEntries = async () => {
-    await refetch();
-  };
-
-  const submit = async (e: SubmitEvent) => {
+  const submit = (e: SubmitEvent) => {
     e.preventDefault();
     const value = text().trim();
-    if (!value) {
-      return;
-    }
-
-    setError(null);
+    if (!value) return;
     setText("");
     inputRef?.focus();
-
-    try {
-      await trpc.inputs.add.mutate({ text: value });
-      await refreshEntries();
-      flashNewest();
-    } catch (caught) {
-      setText(value);
-      setError(getErrorMessage(caught));
-    }
+    addMutation.mutate(value);
   };
 
-  const remove = async (index: number) => {
-    setError(null);
-    try {
-      await trpc.inputs.delete.mutate({ index });
-      await refreshEntries();
-    } catch (caught) {
-      setError(getErrorMessage(caught));
-    }
+  const remove = (index: number) => {
+    deleteMutation.mutate(index);
+  };
+
+  const errorMessage = () => {
+    if (addMutation.isError) return getErrorMessage(addMutation.error);
+    if (deleteMutation.isError) return getErrorMessage(deleteMutation.error);
+    if (entriesQuery.isError) return getErrorMessage(entriesQuery.error);
+    return null;
   };
 
   return (
@@ -73,7 +75,7 @@ export default function App() {
         />
       </form>
 
-      <Show when={error()}>
+      <Show when={errorMessage()}>
         {(message) => (
           <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
             {message()}
@@ -81,7 +83,7 @@ export default function App() {
         )}
       </Show>
 
-      <Show when={!isInitialLoad()} fallback={<div class="px-3 py-2 text-gray-500">Loading…</div>}>
+      <Show when={!entriesQuery.isLoading} fallback={<div class="px-3 py-2 text-gray-500">Loading…</div>}>
         <Show
           when={displayEntries().length > 0}
           fallback={<div class="px-3 py-2 italic text-gray-500">No entries yet</div>}
@@ -95,11 +97,12 @@ export default function App() {
                     "animate-flash": highlightFirst() && i() === 0,
                   }}
                 >
-                  <span class="truncate">{entry.text}</span>
+                  <span class="block text-sm text-gray-500 mt-1">{entry.text}</span>
+                  <span class="truncate text-lg">{transformInput(entry.text)}</span>
                   <button
                     type="button"
                     class="rounded border border-red-300 px-2 py-1 text-sm text-red-700 hover:bg-red-50"
-                    onClick={() => void remove(entry.index)}
+                    onClick={() => remove(entry.index)}
                   >
                     Delete
                   </button>
@@ -112,4 +115,3 @@ export default function App() {
     </div>
   );
 }
-

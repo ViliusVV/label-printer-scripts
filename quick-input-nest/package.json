@@ -16,6 +16,7 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "@tanstack/solid-query": "^5.100.9",
     "@trpc/client": "^11.0.0",
     "@trpc/server": "^11.0.0",
     "express": "^5.1.0",
@@ -38,4 +39,3 @@
     "vite-plugin-solid": "^2.11.0"
   }
 }
-
