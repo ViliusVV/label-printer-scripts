@@ -102,8 +102,6 @@ export type ContactItem = z.infer<typeof contactItemSchema>;
 export type CreateContactBody = z.infer<typeof createContactBodySchema>;
 export type UpdateContactBody = z.infer<typeof updateContactBodySchema>;
 
-export type GeneralEntityItem = NoteItem | BookmarkItem | ContactItem;
-
 const baseRxDocSchema = {
   version: 0,
   primaryKey: "id",
@@ -178,8 +176,6 @@ export const contactCollectionSchema = {
   },
   required: ["id", "name", "email", "company", "createdAt", "updatedAt"],
 } as const;
-
-export type EntityKey = "inputs" | "todos" | "notes" | "bookmarks" | "contacts";
 
 export const entityTabs = [
   { key: "inputs", label: "Inputs", path: "/", source: "text-file" as const, description: "Synced from data/inputs.txt as a line-based text source." },
