@@ -6,7 +6,6 @@ import { InputsController } from "../src/server/inputs/inputs.controller";
 import { InputStorageService } from "../src/server/inputs/input-storage.service";
 import { JsonReplicationController } from "../src/server/replication/json-replication.controller";
 import { JsonReplicationService } from "../src/server/replication/json-replication.service";
-import { TodosController } from "../src/server/todos/todos.controller";
 import { TodosService } from "../src/server/todos/todos.service";
 
 const assert = (condition: unknown, message: string): void => {
@@ -24,7 +23,6 @@ try {
   const inputStorage = new InputStorageService(inputsFile, 10);
   const inputs = new InputsController(inputStorage);
   const todosService = new TodosService(todosFile);
-  const todos = new TodosController(todosService);
   const generalDb = new GeneralDbService(generalDbFile);
   const replication = new JsonReplicationController(new JsonReplicationService(todosService, generalDb));
 
@@ -53,7 +51,7 @@ try {
   }
   assert(notFound, "Expected missing delete to throw");
 
-  const createdTodo = await todos.create({ title: "Ship PWA", details: "Make offline first work", state: "Created" });
+  const createdTodo = await todosService.create({ title: "Ship PWA", details: "Make offline first work", state: "Created" });
   await replication.push("todos", { mutations: [{ op: "upsert", doc: { ...createdTodo, state: "InProgress" as const } }] });
   const todoPull = (await replication.pull("todos", {})) as { items: Array<{ state: string }> };
   assert(todoPull.items[0]?.state === "InProgress", "Todo push upsert should change state");

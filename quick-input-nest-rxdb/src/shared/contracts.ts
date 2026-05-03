@@ -2,9 +2,6 @@ import { z } from "zod";
 
 const isoDateString = z.string().datetime({ offset: true });
 
-export const sourceKindSchema = z.enum(["text-file", "json-file", "shared-json-file"]);
-export type SourceKind = z.infer<typeof sourceKindSchema>;
-
 export const okResponseSchema = z.object({ ok: z.literal(true) });
 export const errorResponseSchema = z.object({ ok: z.literal(false), message: z.string() });
 export type OkResponse = z.infer<typeof okResponseSchema>;
@@ -31,7 +28,6 @@ export const todoItemSchema = z.object({
   updatedAt: isoDateString,
   state: todoStateSchema,
 });
-export const todoListSchema = z.array(todoItemSchema);
 export const createTodoBodySchema = z.object({
   id: z.string().optional(),
   title: z.string().min(1),
@@ -47,12 +43,10 @@ export const updateTodoBodySchema = z.object({
   state: todoStateSchema,
   updatedAt: isoDateString.optional(),
 });
-export const deleteByIdBodySchema = z.object({ id: z.string() });
 export type TodoState = z.infer<typeof todoStateSchema>;
 export type TodoItem = z.infer<typeof todoItemSchema>;
 export type CreateTodoBody = z.infer<typeof createTodoBodySchema>;
 export type UpdateTodoBody = z.infer<typeof updateTodoBodySchema>;
-export type DeleteByIdBody = z.infer<typeof deleteByIdBodySchema>;
 
 const namedEntityBaseSchema = z.object({
   id: z.string(),
@@ -65,7 +59,6 @@ export const noteItemSchema = namedEntityBaseSchema.extend({
   body: z.string(),
   color: z.string(),
 });
-export const noteListSchema = z.array(noteItemSchema);
 export const createNoteBodySchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
@@ -83,7 +76,6 @@ export const bookmarkItemSchema = namedEntityBaseSchema.extend({
   url: z.string().url(),
   category: z.string(),
 });
-export const bookmarkListSchema = z.array(bookmarkItemSchema);
 export const createBookmarkBodySchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
@@ -101,7 +93,6 @@ export const contactItemSchema = namedEntityBaseSchema.extend({
   email: z.string().email(),
   company: z.string(),
 });
-export const contactListSchema = z.array(contactItemSchema);
 export const createContactBodySchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
