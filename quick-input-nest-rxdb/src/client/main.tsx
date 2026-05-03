@@ -4,6 +4,12 @@ import { registerSW } from "virtual:pwa-register";
 import "./index.css";
 import { router } from "./router";
 
+const isLocalhost =
+  typeof location !== "undefined" &&
+  ["localhost", "127.0.0.1", "::1"].includes(location.hostname);
+const canUseServiceWorker =
+  typeof navigator !== "undefined" && "serviceWorker" in navigator && (window.isSecureContext || isLocalhost);
+
 if (import.meta.env.DEV && "serviceWorker" in navigator) {
   void navigator.serviceWorker.getRegistrations().then(async (registrations) => {
     await Promise.all(registrations.map((registration) => registration.unregister()));
@@ -12,7 +18,7 @@ if (import.meta.env.DEV && "serviceWorker" in navigator) {
       await Promise.all(keys.map((key) => caches.delete(key)));
     }
   });
-} else {
+} else if (canUseServiceWorker) {
   registerSW({
     immediate: true,
   });

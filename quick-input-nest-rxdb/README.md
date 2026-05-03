@@ -36,6 +36,7 @@ bun run e2e
 - The server listens on port `3300` by default.
 - The Vite dev server proxies `/api` to the Nest backend.
 - The app is installable as a PWA and ships a generated manifest + service worker.
+- PWA installability/service workers require `https://` or `http://localhost`; when opened via plain LAN HTTP like `http://192.168.x.x`, the app runs as a normal web app without registering the service worker.
 - The client stores five routed entity tabs in RxDB collections: Inputs, Todos, Notes, Bookmarks, and Contacts.
 - The app demonstrates three sync-source styles: a text file (`inputs.txt`), a dedicated JSON file (`todo.json`), and several collections sharing one JSON database (`general_db.json`).
 - Todos, Notes, Bookmarks, and Contacts now use shared generic `pull` / `push` replication contracts under `/api/replication/:entity/*` plus a local-first optimistic mutation outbox that replays on reconnect.
