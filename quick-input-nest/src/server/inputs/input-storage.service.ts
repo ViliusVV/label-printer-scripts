@@ -43,6 +43,8 @@ export class InputStorageService {
     const transformed = transformInput(trimmed);
     if (transformed !== null) {
       await appendFile("inputs_transformed.txt", `${transformed}\n`, "utf-8");
+    } else {
+      throw new Error("Cant transform")
     }
   }
 
