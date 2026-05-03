@@ -1,0 +1,3 @@
+export const INPUTS_FILE_PATH = Symbol("INPUTS_FILE_PATH");
+export const INPUTS_MAX_ITEMS = Symbol("INPUTS_MAX_ITEMS");
+
