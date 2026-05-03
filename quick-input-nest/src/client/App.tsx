@@ -1,15 +1,13 @@
 import { createSignal, For, Show } from "solid-js";
-import {createMutation, createQuery, QueryClient, useQueryClient} from "@tanstack/solid-query";
+import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import type { RouterOutputs } from "../shared/api";
 import { transformInput } from "../shared/transform";
 import { getErrorMessage, trpc } from "./trpc";
 
 type InputEntry = RouterOutputs["inputs"]["list"][number];
 
-const queryClient = new QueryClient();
-
-
 export default function App() {
+  const queryClient = useQueryClient();
   const [text, setText] = createSignal("");
   const [highlightFirst, setHighlightFirst] = createSignal(false);
 
