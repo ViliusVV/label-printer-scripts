@@ -95,8 +95,9 @@ export default function App() {
                     "animate-flash": highlightFirst() && i() === 0,
                   }}
                 >
+                  <span class="truncate text-lg">{transformInput(entry.text) ?? entry.text}</span>
                   <span class="block text-sm text-gray-500 mt-1">{entry.text}</span>
-                  <span class="truncate text-lg">{transformInput(entry.text)}</span>
+
                   <button
                     type="button"
                     class="rounded border border-red-300 px-2 py-1 text-sm text-red-700 hover:bg-red-50"

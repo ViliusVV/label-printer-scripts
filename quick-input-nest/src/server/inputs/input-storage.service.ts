@@ -41,7 +41,9 @@ export class InputStorageService {
     await appendFile(this.filePath, `${trimmed}\n`, "utf-8");
 
     const transformed = transformInput(trimmed);
-    await appendFile("inputs_transformed.txt", `${transformed}\n`, "utf-8");
+    if (transformed !== null) {
+      await appendFile("inputs_transformed.txt", `${transformed}\n`, "utf-8");
+    }
   }
 
   async listLatest(): Promise<InputItem[]> {
