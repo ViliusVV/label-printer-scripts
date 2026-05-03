@@ -1,7 +1,9 @@
 import {
   addInputBodySchema,
   bookmarkListSchema,
+  bookmarkItemSchema,
   contactListSchema,
+  contactItemSchema,
   createBookmarkBodySchema,
   createContactBodySchema,
   createNoteBodySchema,
@@ -37,6 +39,23 @@ import {
   type UpdateTodoBody,
 } from "../shared/contracts";
 
+type Parser<T> = { parse: (value: unknown) => T };
+
+type TextCollectionApiConfig<Item, CreateBody, DeleteBody> = {
+  basePath: string;
+  listSchema: Parser<Item[]>;
+  createSchema: Parser<CreateBody>;
+  deleteSchema: Parser<DeleteBody>;
+};
+
+type CrudCollectionApiConfig<Item, CreateBody, UpdateBody> = {
+  basePath: string;
+  listSchema: Parser<Item[]>;
+  itemSchema: Parser<Item>;
+  createSchema: Parser<CreateBody>;
+  updateSchema: Parser<UpdateBody>;
+};
+
 const readErrorMessage = async (response: Response): Promise<string> => {
   try {
     const body = await response.json();
@@ -58,37 +77,6 @@ const expectOk = async (response: Response) => {
 
   return okResponseSchema.parse(await response.json());
 };
-
-export async function listInputs(): Promise<InputItem[]> {
-  const response = await fetch("/api/inputs/list");
-  if (!response.ok) {
-    throw new Error(await readErrorMessage(response));
-  }
-
-  return inputListSchema.parse(await response.json());
-}
-
-export async function addInput(body: AddInputBody): Promise<void> {
-  const parsed = addInputBodySchema.parse(body);
-  const response = await fetch("/api/inputs/add", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(parsed),
-  });
-
-  await expectOk(response);
-}
-
-export async function deleteInput(body: DeleteInputBody): Promise<void> {
-  const parsed = deleteInputBodySchema.parse(body);
-  const response = await fetch("/api/inputs/delete", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(parsed),
-  });
-
-  await expectOk(response);
-}
 
 const getJson = async <T>(url: string, parser: { parse: (value: unknown) => T }): Promise<T> => {
   const response = await fetch(url);
@@ -114,40 +102,91 @@ const postJson = async <TBody, TResult>(
   return parser.parse(await response.json());
 };
 
-export const listTodos = async (): Promise<TodoItem[]> => getJson("/api/todos/list", todoListSchema);
-export const createTodo = async (body: CreateTodoBody): Promise<TodoItem> =>
-  postJson("/api/todos/create", createTodoBodySchema.parse(body), todoItemSchema);
-export const updateTodo = async (body: UpdateTodoBody): Promise<TodoItem> =>
-  postJson("/api/todos/update", updateTodoBodySchema.parse(body), todoItemSchema);
+const createTextCollectionApi = <Item, CreateBody, DeleteBody>(config: TextCollectionApiConfig<Item, CreateBody, DeleteBody>) => ({
+  list: () => getJson(`${config.basePath}/list`, config.listSchema),
+  create: (body: CreateBody) => postJson(`${config.basePath}/add`, config.createSchema.parse(body), okResponseSchema),
+  delete: (body: DeleteBody) => postJson(`${config.basePath}/delete`, config.deleteSchema.parse(body), okResponseSchema),
+});
+
+const createCrudCollectionApi = <Item, CreateBody, UpdateBody>(config: CrudCollectionApiConfig<Item, CreateBody, UpdateBody>) => ({
+  list: () => getJson(`${config.basePath}/list`, config.listSchema),
+  create: (body: CreateBody) => postJson(`${config.basePath}/create`, config.createSchema.parse(body), config.itemSchema),
+  update: (body: UpdateBody) => postJson(`${config.basePath}/update`, config.updateSchema.parse(body), config.itemSchema),
+  delete: (body: DeleteByIdBody) => postJson(`${config.basePath}/delete`, deleteByIdBodySchema.parse(body), okResponseSchema),
+});
+
+const inputsApi = createTextCollectionApi<InputItem, AddInputBody, DeleteInputBody>({
+  basePath: "/api/inputs",
+  listSchema: inputListSchema,
+  createSchema: addInputBodySchema,
+  deleteSchema: deleteInputBodySchema,
+});
+
+const todosApi = createCrudCollectionApi<TodoItem, CreateTodoBody, UpdateTodoBody>({
+  basePath: "/api/todos",
+  listSchema: todoListSchema,
+  itemSchema: todoItemSchema,
+  createSchema: createTodoBodySchema,
+  updateSchema: updateTodoBodySchema,
+});
+
+const notesApi = createCrudCollectionApi<NoteItem, CreateNoteBody, UpdateNoteBody>({
+  basePath: "/api/notes",
+  listSchema: noteListSchema,
+  itemSchema: noteItemSchema,
+  createSchema: createNoteBodySchema,
+  updateSchema: updateNoteBodySchema,
+});
+
+const bookmarksApi = createCrudCollectionApi<BookmarkItem, CreateBookmarkBody, UpdateBookmarkBody>({
+  basePath: "/api/bookmarks",
+  listSchema: bookmarkListSchema,
+  itemSchema: bookmarkItemSchema,
+  createSchema: createBookmarkBodySchema,
+  updateSchema: updateBookmarkBodySchema,
+});
+
+const contactsApi = createCrudCollectionApi<ContactItem, CreateContactBody, UpdateContactBody>({
+  basePath: "/api/contacts",
+  listSchema: contactListSchema,
+  itemSchema: contactItemSchema,
+  createSchema: createContactBodySchema,
+  updateSchema: updateContactBodySchema,
+});
+
+export const listInputs = inputsApi.list;
+export const addInput = async (body: AddInputBody): Promise<void> => {
+  await inputsApi.create(body);
+};
+export const deleteInput = async (body: DeleteInputBody): Promise<void> => {
+  await inputsApi.delete(body);
+};
+
+export const listTodos = todosApi.list;
+export const createTodo = todosApi.create;
+export const updateTodo = todosApi.update;
 export const deleteTodo = async (body: DeleteByIdBody): Promise<void> => {
-  await postJson("/api/todos/delete", deleteByIdBodySchema.parse(body), okResponseSchema);
+  await todosApi.delete(body);
 };
 
-export const listNotes = async (): Promise<NoteItem[]> => getJson("/api/notes/list", noteListSchema);
-export const createNote = async (body: CreateNoteBody): Promise<NoteItem> =>
-  postJson("/api/notes/create", createNoteBodySchema.parse(body), noteItemSchema);
-export const updateNote = async (body: UpdateNoteBody): Promise<NoteItem> =>
-  postJson("/api/notes/update", updateNoteBodySchema.parse(body), noteItemSchema);
+export const listNotes = notesApi.list;
+export const createNote = notesApi.create;
+export const updateNote = notesApi.update;
 export const deleteNote = async (body: DeleteByIdBody): Promise<void> => {
-  await postJson("/api/notes/delete", deleteByIdBodySchema.parse(body), okResponseSchema);
+  await notesApi.delete(body);
 };
 
-export const listBookmarks = async (): Promise<BookmarkItem[]> =>
-  getJson("/api/bookmarks/list", bookmarkListSchema);
-export const createBookmark = async (body: CreateBookmarkBody): Promise<BookmarkItem> =>
-  postJson("/api/bookmarks/create", createBookmarkBodySchema.parse(body), bookmarkListSchema.element);
-export const updateBookmark = async (body: UpdateBookmarkBody): Promise<BookmarkItem> =>
-  postJson("/api/bookmarks/update", updateBookmarkBodySchema.parse(body), bookmarkListSchema.element);
+export const listBookmarks = bookmarksApi.list;
+export const createBookmark = bookmarksApi.create;
+export const updateBookmark = bookmarksApi.update;
 export const deleteBookmark = async (body: DeleteByIdBody): Promise<void> => {
-  await postJson("/api/bookmarks/delete", deleteByIdBodySchema.parse(body), okResponseSchema);
+  await bookmarksApi.delete(body);
 };
 
-export const listContacts = async (): Promise<ContactItem[]> => getJson("/api/contacts/list", contactListSchema);
-export const createContact = async (body: CreateContactBody): Promise<ContactItem> =>
-  postJson("/api/contacts/create", createContactBodySchema.parse(body), contactListSchema.element);
-export const updateContact = async (body: UpdateContactBody): Promise<ContactItem> =>
-  postJson("/api/contacts/update", updateContactBodySchema.parse(body), contactListSchema.element);
+export const listContacts = contactsApi.list;
+export const createContact = contactsApi.create;
+export const updateContact = contactsApi.update;
 export const deleteContact = async (body: DeleteByIdBody): Promise<void> => {
-  await postJson("/api/contacts/delete", deleteByIdBodySchema.parse(body), okResponseSchema);
+  await contactsApi.delete(body);
 };
 

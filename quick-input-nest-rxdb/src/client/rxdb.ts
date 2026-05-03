@@ -42,6 +42,8 @@ import {
   type UpdateTodoBody,
 } from "../shared/contracts";
 
+type SortSpec = Array<Record<string, "asc" | "desc">>;
+
 type AppCollections = {
   inputs: RxCollection<InputItem>;
   todos: RxCollection<TodoItem>;
@@ -98,6 +100,60 @@ const replaceCollection = async <K extends keyof CollectionMap>(name: K, items: 
   }
 };
 
+const createSyncHelpers = <K extends keyof CollectionMap>(config: {
+  name: K;
+  list: () => Promise<CollectionMap[K][]>;
+  sort: SortSpec;
+}) => ({
+  sync: async (): Promise<CollectionMap[K][]> => {
+    const items = await config.list();
+    await replaceCollection(config.name, items);
+    return items;
+  },
+  watch: (onItems: (items: CollectionMap[K][]) => void) => watchCollection(config.name, config.sort, onItems),
+});
+
+const createCrudEntityHelpers = <K extends keyof CollectionMap, CreateBody, UpdateBody>(config: {
+  sync: () => Promise<CollectionMap[K][]>;
+  watch: (onItems: (items: CollectionMap[K][]) => void) => Promise<() => void>;
+  create: (body: CreateBody) => Promise<unknown>;
+  update: (body: UpdateBody) => Promise<unknown>;
+  remove: (id: string) => Promise<void>;
+}) => ({
+  sync: config.sync,
+  watch: config.watch,
+  createEntry: async (body: CreateBody): Promise<void> => {
+    await config.create(body);
+    await config.sync();
+  },
+  updateEntry: async (body: UpdateBody): Promise<void> => {
+    await config.update(body);
+    await config.sync();
+  },
+  deleteEntry: async (id: string): Promise<void> => {
+    await config.remove(id);
+    await config.sync();
+  },
+});
+
+const createTextEntityHelpers = <K extends keyof CollectionMap>(config: {
+  sync: () => Promise<CollectionMap[K][]>;
+  watch: (onItems: (items: CollectionMap[K][]) => void) => Promise<() => void>;
+  create: (text: string) => Promise<unknown>;
+  remove: (index: number) => Promise<void>;
+}) => ({
+  sync: config.sync,
+  watch: config.watch,
+  createEntry: async (text: string): Promise<void> => {
+    await config.create(text);
+    await config.sync();
+  },
+  removeEntry: async (index: number): Promise<void> => {
+    await config.remove(index);
+    await config.sync();
+  },
+});
+
 const watchCollection = async <K extends keyof CollectionMap>(
   name: K,
   sort: Array<Record<string, "asc" | "desc">>,
@@ -111,109 +167,72 @@ const watchCollection = async <K extends keyof CollectionMap>(
   return () => subscription.unsubscribe();
 };
 
-export const syncInputs = async (): Promise<InputItem[]> => {
-  const items = await listInputs();
-  await replaceCollection("inputs", items);
-  return items;
-};
+const inputsSync = createSyncHelpers({ name: "inputs", list: listInputs, sort: [{ index: "desc" }] });
+const todosSync = createSyncHelpers({ name: "todos", list: listTodos, sort: [{ updatedAt: "desc" }] });
+const notesSync = createSyncHelpers({ name: "notes", list: listNotes, sort: [{ updatedAt: "desc" }] });
+const bookmarksSync = createSyncHelpers({ name: "bookmarks", list: listBookmarks, sort: [{ updatedAt: "desc" }] });
+const contactsSync = createSyncHelpers({ name: "contacts", list: listContacts, sort: [{ updatedAt: "desc" }] });
 
-export const syncTodos = async (): Promise<TodoItem[]> => {
-  const items = await listTodos();
-  await replaceCollection("todos", items);
-  return items;
-};
+const inputsEntity = createTextEntityHelpers({
+  ...inputsSync,
+  create: (text: string) => addInput({ text }),
+  remove: (index: number) => deleteInput({ index }),
+});
 
-export const syncNotes = async (): Promise<NoteItem[]> => {
-  const items = await listNotes();
-  await replaceCollection("notes", items);
-  return items;
-};
+const todosEntity = createCrudEntityHelpers<"todos", CreateTodoBody, UpdateTodoBody>({
+  ...todosSync,
+  create: createTodo,
+  update: updateTodo,
+  remove: (id: string) => deleteTodo({ id }),
+});
 
-export const syncBookmarks = async (): Promise<BookmarkItem[]> => {
-  const items = await listBookmarks();
-  await replaceCollection("bookmarks", items);
-  return items;
-};
+const notesEntity = createCrudEntityHelpers<"notes", CreateNoteBody, UpdateNoteBody>({
+  ...notesSync,
+  create: createNote,
+  update: updateNote,
+  remove: (id: string) => deleteNote({ id }),
+});
 
-export const syncContacts = async (): Promise<ContactItem[]> => {
-  const items = await listContacts();
-  await replaceCollection("contacts", items);
-  return items;
-};
+const bookmarksEntity = createCrudEntityHelpers<"bookmarks", CreateBookmarkBody, UpdateBookmarkBody>({
+  ...bookmarksSync,
+  create: createBookmark,
+  update: updateBookmark,
+  remove: (id: string) => deleteBookmark({ id }),
+});
 
-export const watchInputs = (onItems: (items: InputItem[]) => void) => watchCollection("inputs", [{ index: "desc" }], onItems);
-export const watchTodos = (onItems: (items: TodoItem[]) => void) => watchCollection("todos", [{ updatedAt: "desc" }], onItems);
-export const watchNotes = (onItems: (items: NoteItem[]) => void) => watchCollection("notes", [{ updatedAt: "desc" }], onItems);
-export const watchBookmarks = (onItems: (items: BookmarkItem[]) => void) => watchCollection("bookmarks", [{ updatedAt: "desc" }], onItems);
-export const watchContacts = (onItems: (items: ContactItem[]) => void) => watchCollection("contacts", [{ updatedAt: "desc" }], onItems);
+const contactsEntity = createCrudEntityHelpers<"contacts", CreateContactBody, UpdateContactBody>({
+  ...contactsSync,
+  create: createContact,
+  update: updateContact,
+  remove: (id: string) => deleteContact({ id }),
+});
 
-export const createInputEntry = async (text: string): Promise<void> => {
-  await addInput({ text });
-  await syncInputs();
-};
+export const syncInputs = inputsEntity.sync;
+export const watchInputs = inputsEntity.watch;
+export const createInputEntry = inputsEntity.createEntry;
+export const removeInputEntry = inputsEntity.removeEntry;
 
-export const removeInputEntry = async (index: number): Promise<void> => {
-  await deleteInput({ index });
-  await syncInputs();
-};
+export const syncTodos = todosEntity.sync;
+export const watchTodos = todosEntity.watch;
+export const createTodoEntry = todosEntity.createEntry;
+export const updateTodoEntry = todosEntity.updateEntry;
+export const deleteTodoEntry = todosEntity.deleteEntry;
 
-export const createTodoEntry = async (body: CreateTodoBody): Promise<void> => {
-  await createTodo(body);
-  await syncTodos();
-};
+export const syncNotes = notesEntity.sync;
+export const watchNotes = notesEntity.watch;
+export const createNoteEntry = notesEntity.createEntry;
+export const updateNoteEntry = notesEntity.updateEntry;
+export const deleteNoteEntry = notesEntity.deleteEntry;
 
-export const updateTodoEntry = async (body: UpdateTodoBody): Promise<void> => {
-  await updateTodo(body);
-  await syncTodos();
-};
+export const syncBookmarks = bookmarksEntity.sync;
+export const watchBookmarks = bookmarksEntity.watch;
+export const createBookmarkEntry = bookmarksEntity.createEntry;
+export const updateBookmarkEntry = bookmarksEntity.updateEntry;
+export const deleteBookmarkEntry = bookmarksEntity.deleteEntry;
 
-export const deleteTodoEntry = async (id: string): Promise<void> => {
-  await deleteTodo({ id });
-  await syncTodos();
-};
-
-export const createNoteEntry = async (body: CreateNoteBody): Promise<void> => {
-  await createNote(body);
-  await syncNotes();
-};
-
-export const updateNoteEntry = async (body: UpdateNoteBody): Promise<void> => {
-  await updateNote(body);
-  await syncNotes();
-};
-
-export const deleteNoteEntry = async (id: string): Promise<void> => {
-  await deleteNote({ id });
-  await syncNotes();
-};
-
-export const createBookmarkEntry = async (body: CreateBookmarkBody): Promise<void> => {
-  await createBookmark(body);
-  await syncBookmarks();
-};
-
-export const updateBookmarkEntry = async (body: UpdateBookmarkBody): Promise<void> => {
-  await updateBookmark(body);
-  await syncBookmarks();
-};
-
-export const deleteBookmarkEntry = async (id: string): Promise<void> => {
-  await deleteBookmark({ id });
-  await syncBookmarks();
-};
-
-export const createContactEntry = async (body: CreateContactBody): Promise<void> => {
-  await createContact(body);
-  await syncContacts();
-};
-
-export const updateContactEntry = async (body: UpdateContactBody): Promise<void> => {
-  await updateContact(body);
-  await syncContacts();
-};
-
-export const deleteContactEntry = async (id: string): Promise<void> => {
-  await deleteContact({ id });
-  await syncContacts();
-};
+export const syncContacts = contactsEntity.sync;
+export const watchContacts = contactsEntity.watch;
+export const createContactEntry = contactsEntity.createEntry;
+export const updateContactEntry = contactsEntity.updateEntry;
+export const deleteContactEntry = contactsEntity.deleteEntry;
 
