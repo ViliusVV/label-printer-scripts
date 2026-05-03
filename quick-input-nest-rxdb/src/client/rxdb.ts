@@ -1,4 +1,4 @@
-import { createRxDatabase, type RxCollection, type RxDatabase } from "rxdb";
+import { addRxPlugin, createRxDatabase, type RxCollection, type RxDatabase } from "rxdb";
 import { getRxStorageDexie } from "rxdb/plugins/storage-dexie";
 import {
   addInput,
@@ -62,6 +62,15 @@ type AppCollections = {
   outbox: RxCollection<OutboxMutation>;
 };
 
+type AppDatabase = RxDatabase<AppCollections>;
+
+declare global {
+  interface Window {
+    __quickInputRxdbPromise__?: Promise<AppDatabase>;
+    __quickInputRxdbDevModePromise__?: Promise<void>;
+  }
+}
+
 type CollectionMap = {
   inputs: InputItem;
   todos: TodoItem;
@@ -119,15 +128,48 @@ const setSyncState = (patch: Partial<SyncState>) => {
   emitSyncState();
 };
 
-let dbPromise: Promise<RxDatabase<AppCollections>> | undefined;
+const getGlobalDbPromise = (): Promise<AppDatabase> | undefined => {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+  return window.__quickInputRxdbPromise__;
+};
 
-const getDatabase = async (): Promise<RxDatabase<AppCollections>> => {
-  if (!dbPromise) {
-    dbPromise = (async () => {
+const setGlobalDbPromise = (promise: Promise<AppDatabase>): Promise<AppDatabase> => {
+  if (typeof window !== "undefined") {
+    window.__quickInputRxdbPromise__ = promise;
+  }
+  return promise;
+};
+
+const ensureRxdbDevMode = async (): Promise<void> => {
+  if (!import.meta.env.DEV || typeof window === "undefined") {
+    return;
+  }
+
+  if (!window.__quickInputRxdbDevModePromise__) {
+    window.__quickInputRxdbDevModePromise__ = (async () => {
+      const { RxDBDevModePlugin } = await import("rxdb/plugins/dev-mode");
+      addRxPlugin(RxDBDevModePlugin);
+    })();
+  }
+
+  await window.__quickInputRxdbDevModePromise__;
+};
+
+const getDatabase = async (): Promise<AppDatabase> => {
+  await ensureRxdbDevMode();
+
+  const existingPromise = getGlobalDbPromise();
+  if (existingPromise) {
+    return existingPromise;
+  }
+
+  const dbPromise = setGlobalDbPromise(
+    (async () => {
       const db = await createRxDatabase<AppCollections>({
         name: "quick-input-nest-rxdb",
         storage: getRxStorageDexie(),
-        ignoreDuplicate: true,
       });
 
       await db.addCollections({
@@ -140,8 +182,8 @@ const getDatabase = async (): Promise<RxDatabase<AppCollections>> => {
       });
 
       return db;
-    })();
-  }
+    })(),
+  );
 
   return dbPromise;
 };
