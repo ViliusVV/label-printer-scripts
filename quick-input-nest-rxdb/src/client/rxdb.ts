@@ -64,11 +64,13 @@ type AppCollections = {
 
 type AppDatabase = RxDatabase<AppCollections>;
 
+type RxdbGlobalState = {
+  promise?: Promise<AppDatabase>;
+  devModePromise?: Promise<void>;
+};
+
 declare global {
-  interface Window {
-    __quickInputRxdbPromise__?: Promise<AppDatabase>;
-    __quickInputRxdbDevModePromise__?: Promise<void>;
-  }
+  var __quickInputRxdbState__: RxdbGlobalState | undefined;
 }
 
 type CollectionMap = {
@@ -128,38 +130,49 @@ const setSyncState = (patch: Partial<SyncState>) => {
   emitSyncState();
 };
 
-const getGlobalDbPromise = (): Promise<AppDatabase> | undefined => {
-  if (typeof window === "undefined") {
-    return undefined;
+const getRxdbGlobalState = (): RxdbGlobalState => {
+  if (!globalThis.__quickInputRxdbState__) {
+    globalThis.__quickInputRxdbState__ = {};
   }
-  return window.__quickInputRxdbPromise__;
+  return globalThis.__quickInputRxdbState__;
+};
+
+const getGlobalDbPromise = (): Promise<AppDatabase> | undefined => {
+  return getRxdbGlobalState().promise;
 };
 
 const setGlobalDbPromise = (promise: Promise<AppDatabase>): Promise<AppDatabase> => {
-  if (typeof window !== "undefined") {
-    window.__quickInputRxdbPromise__ = promise;
-  }
+  getRxdbGlobalState().promise = promise;
   return promise;
 };
 
 const ensureRxdbDevMode = async (): Promise<void> => {
-  if (!import.meta.env.DEV || typeof window === "undefined") {
+  if (!import.meta.env.DEV) {
     return;
   }
 
-  if (!window.__quickInputRxdbDevModePromise__) {
-    window.__quickInputRxdbDevModePromise__ = (async () => {
+  const state = getRxdbGlobalState();
+  if (!state.devModePromise) {
+    state.devModePromise = (async () => {
       const { RxDBDevModePlugin } = await import("rxdb/plugins/dev-mode");
       addRxPlugin(RxDBDevModePlugin);
     })();
   }
 
-  await window.__quickInputRxdbDevModePromise__;
+  await state.devModePromise;
+};
+
+const getConfiguredStorage = async () => {
+  const storage = getRxStorageDexie();
+  if (!import.meta.env.DEV) {
+    return storage;
+  }
+
+  const { wrappedValidateAjvStorage } = await import("rxdb/plugins/validate-ajv");
+  return wrappedValidateAjvStorage({ storage });
 };
 
 const getDatabase = async (): Promise<AppDatabase> => {
-  await ensureRxdbDevMode();
-
   const existingPromise = getGlobalDbPromise();
   if (existingPromise) {
     return existingPromise;
@@ -167,9 +180,11 @@ const getDatabase = async (): Promise<AppDatabase> => {
 
   const dbPromise = setGlobalDbPromise(
     (async () => {
+      await ensureRxdbDevMode();
+      const storage = await getConfiguredStorage();
       const db = await createRxDatabase<AppCollections>({
         name: "quick-input-nest-rxdb",
-        storage: getRxStorageDexie(),
+        storage,
       });
 
       await db.addCollections({
@@ -182,11 +197,18 @@ const getDatabase = async (): Promise<AppDatabase> => {
       });
 
       return db;
-    })(),
+    })().catch((error) => {
+      const state = getRxdbGlobalState();
+      if (state.promise === dbPromise) {
+        state.promise = undefined;
+      }
+      throw error;
+    }),
   );
 
   return dbPromise;
 };
+
 
 const getCollection = async <K extends keyof CollectionMap>(name: K): Promise<RxCollection<CollectionMap[K]>> => {
   const db = await getDatabase();
