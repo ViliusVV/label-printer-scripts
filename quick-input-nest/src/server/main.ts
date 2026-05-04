@@ -2,13 +2,13 @@ import "reflect-metadata";
 import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { RPCHandler } from "@orpc/server/node";
 import { existsSync } from "node:fs";
 import type { Request, Response } from "express";
 import { AppModule } from "./app.module";
 import { CLIENT_ASSETS_DIR, HOST, INDEX_HTML, INPUTS_FILE, PORT } from "./config";
 import { InputStorageService } from "./inputs/input-storage.service";
-import { createAppRouter } from "./trpc/app.router";
+import { appRouter } from "./orpc/app.router";
 
 const log = new Logger("QuickInputNest");
 
@@ -32,19 +32,20 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const inputs = app.get(InputStorageService);
   const expressApp = app.getHttpAdapter().getInstance();
-  const appRouter = createAppRouter(inputs);
+  const rpcHandler = new RPCHandler(appRouter);
 
   app.enableCors({ origin: true });
 
-  expressApp.use(
-    "/api/trpc",
-    createExpressMiddleware({
-      router: appRouter,
-      createContext: () => ({}),
-    }),
-  );
+  expressApp.use("/api/rpc{*path}", async (req: Request, res: Response, next: () => void) => {
+    const { matched } = await rpcHandler.handle(req, res, {
+      prefix: "/api/rpc",
+      context: { inputs },
+    });
+    if (matched) return;
+    next();
+  });
 
-  expressApp.get(/^\/(?!api\/trpc(?:\/|$)|assets(?:\/|$)).*/, sendClient);
+  expressApp.get(/^\/(?!api\/rpc(?:\/|$)|assets(?:\/|$)).*/, sendClient);
 
   await app.listen(port, host);
   log.log(`Quick Input Nest listening on http://${host}:${port} -> writing to ${INPUTS_FILE}`);
@@ -54,4 +55,3 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
 if (import.meta.main) {
   void bootstrap();
 }
-

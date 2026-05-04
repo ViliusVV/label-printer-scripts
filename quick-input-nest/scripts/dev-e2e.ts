@@ -1,7 +1,11 @@
 import { spawn, type Subprocess } from "bun";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import type { RouterClient } from "@orpc/server";
 import { chromium } from "playwright";
+import type { AppRouter } from "../src/shared/api";
 
 const projectDir = resolve(fileURLToPath(import.meta.url), "..", "..");
 
@@ -39,7 +43,7 @@ async function waitForUrl(url: string, timeoutMs = 20_000): Promise<boolean> {
       const id = setTimeout(() => ctrl.abort(), 2000);
       const res = await fetch(url, { signal: ctrl.signal });
       clearTimeout(id);
-      if (res.ok || res.status === 304) return true;
+      if (res.status > 0) return true;
     } catch {}
     await new Promise((r) => setTimeout(r, 500));
   }
@@ -49,7 +53,12 @@ async function waitForUrl(url: string, timeoutMs = 20_000): Promise<boolean> {
 const SERVER_PORT = 3333;
 const VITE_PORT = 5174;
 const VITE_URL = `http://127.0.0.1:${VITE_PORT}`;
-const SERVER_TRPC = `http://127.0.0.1:${SERVER_PORT}/trpc/inputs.list`;
+const SERVER_RPC = `http://127.0.0.1:${SERVER_PORT}/api/rpc`;
+const SERVER_ROOT = `http://127.0.0.1:${SERVER_PORT}/`;
+
+const orpcClient: RouterClient<AppRouter> = createORPCClient(
+  new RPCLink({ url: SERVER_RPC }),
+);
 
 let serverProc: Subprocess | null = null;
 let clientProc: Subprocess | null = null;
@@ -77,7 +86,7 @@ try {
     stdio: ["ignore", "pipe", "pipe"],
   });
   drainProc(serverProc, "server");
-  if (!(await waitForUrl(SERVER_TRPC)))
+  if (!(await waitForUrl(SERVER_ROOT)))
     throw new Error("NestJS failed to start");
   results.push("PASS  NestJS :3333");
   console.log("  ✓ NestJS ready on :3333\n");
@@ -105,13 +114,15 @@ try {
   console.log(`  #root div: ${hasRoot ? "YES" : "NO"}`);
   console.log(`  HMR injected: ${hasHmr ? "YES" : "NO"}\n`);
 
-  // 4. tRPC endpoint check
-  console.log("[4/5] Checking tRPC endpoint...");
-  const trpcRes = await fetch(SERVER_TRPC);
-  const trpcJson = await trpcRes.json();
-  const trpcWorking = trpcJson && "result" in trpcJson;
-  results.push(`PASS  tRPC: ${trpcWorking ? "OK" : "FAILED"}`);
-  console.log(`  tRPC: ${trpcWorking ? "OK" : "FAILED"}\n`);
+  // 4. oRPC endpoint check
+  console.log("[4/5] Checking oRPC endpoint...");
+  let rpcWorking = false;
+  try {
+    const entries = await orpcClient.inputs.list();
+    rpcWorking = Array.isArray(entries);
+  } catch {}
+  results.push(`PASS  oRPC: ${rpcWorking ? "OK" : "FAILED"}`);
+  console.log(`  oRPC: ${rpcWorking ? "OK" : "FAILED"}\n`);
 
   // 5. Browser test
   console.log("[5/5] Browser test...");
@@ -158,29 +169,22 @@ try {
           (await page.getByText("e2e-test-entry").count()) > 0;
         console.log(`  Entry in UI: ${entryFound ? "YES" : "NO"}`);
 
-        const trpcRes2 = await fetch(SERVER_TRPC);
-        const trpcJson2 = await trpcRes2.json();
-        const entries = trpcJson2?.result?.data ?? [];
-        const serverHas = entries.some(
-          (e: any) => e.text === "e2e-test-entry",
-        );
+        let serverHas = false;
+        let serverEntries: Awaited<ReturnType<typeof orpcClient.inputs.list>> = [];
+        try {
+          serverEntries = await orpcClient.inputs.list();
+          serverHas = serverEntries.some((e) => e.text === "e2e-test-entry");
+        } catch {}
         console.log(
-          `  Entry via tRPC: ${serverHas ? "YES" : "NO"} (${entries.length} total)`,
+          `  Entry via oRPC: ${serverHas ? "YES" : "NO"} (${serverEntries.length} total)`,
         );
 
         if (serverHas) {
-          const entry = entries.find(
-            (e: any) => e.text === "e2e-test-entry",
-          );
-          await fetch(
-            `http://127.0.0.1:${SERVER_PORT}/trpc/inputs.delete`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ index: entry.index }),
-            },
-          );
-          console.log("  Cleanup: deleted test entry");
+          const entry = serverEntries.find((e) => e.text === "e2e-test-entry");
+          if (entry) {
+            await orpcClient.inputs.delete({ index: entry.index });
+            console.log("  Cleanup: deleted test entry");
+          }
         }
 
         browserOk = entryFound && serverHas;

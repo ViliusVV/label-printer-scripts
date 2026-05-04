@@ -1,8 +1,9 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { createRouterClient } from "@orpc/server";
 import { InputStorageService } from "../src/server/inputs/input-storage.service";
-import { createAppRouter } from "../src/server/trpc/app.router";
+import { appRouter } from "../src/server/orpc/app.router";
 
 const assert = (condition: unknown, message: string): void => {
   if (!condition) {
@@ -15,19 +16,19 @@ const filePath = join(tempDir, "inputs.txt");
 
 try {
   const storage = new InputStorageService(filePath, join(tempDir, "transformed.txt"), 10);
-  const caller = createAppRouter(storage).createCaller({});
+  const client = createRouterClient(appRouter, { context: { inputs: storage } });
 
-  await caller.inputs.add({ text: "  first  " });
-  await caller.inputs.add({ text: "   " });
-  await caller.inputs.add({ text: "second" });
+  await client.inputs.add({ text: "  first  " });
+  await client.inputs.add({ text: "   " });
+  await client.inputs.add({ text: "second" });
 
-  let entries = await caller.inputs.list();
+  let entries = await client.inputs.list();
   assert(entries.length === 2, `Expected 2 entries, received ${entries.length}`);
   assert(entries[0]?.text === "second", "Newest entry should be first");
   assert(entries[1]?.text === "first", "Trimmed text should be persisted");
 
-  await caller.inputs.delete({ index: 0 });
-  entries = await caller.inputs.list();
+  await client.inputs.delete({ index: 0 });
+  entries = await client.inputs.list();
   assert(entries.length === 1, `Expected 1 entry after deletion, received ${entries.length}`);
   assert(entries[0]?.text === "second", "Deleting absolute index 0 should keep the second row");
 
@@ -36,7 +37,7 @@ try {
 
   let notFound = false;
   try {
-    await caller.inputs.delete({ index: 9 });
+    await client.inputs.delete({ index: 9 });
   } catch {
     notFound = true;
   }
@@ -46,4 +47,3 @@ try {
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }
-

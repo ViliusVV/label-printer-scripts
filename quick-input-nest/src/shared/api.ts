@@ -1,7 +1,6 @@
-import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
-import type { AppRouter as ServerAppRouter } from "../server/trpc/app.router";
+import type { InferRouterInputs, InferRouterOutputs } from "@orpc/server";
+import type { AppRouter as ServerAppRouter } from "../server/orpc/app.router";
 
 export type AppRouter = ServerAppRouter;
-export type RouterInputs = inferRouterInputs<AppRouter>;
-export type RouterOutputs = inferRouterOutputs<AppRouter>;
-
+export type RouterInputs = InferRouterInputs<AppRouter>;
+export type RouterOutputs = InferRouterOutputs<AppRouter>;

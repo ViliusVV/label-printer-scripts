@@ -1,11 +1,11 @@
 # quick-input-nest
 
-NestJS + tRPC + Solid rewrite of the original `quick-input` app.
+NestJS + oRPC + Solid rewrite of the original `quick-input` app.
 
 ## Stack
 
 - **Backend:** NestJS on Bun
-- **API:** tRPC
+- **API:** oRPC
 - **Frontend:** Solid + Vite
 - **Storage:** append-only text file at `../data/inputs.txt`
 
@@ -38,8 +38,8 @@ bun run e2e
 ## Notes
 
 - The server listens on port `3300` by default.
-- The Vite dev server proxies `/trpc` to the Nest backend.
+- The Vite dev server proxies `/api/rpc` to the Nest backend.
 - In production mode, Nest serves `dist/client` and the `/assets` bundle directly.
-- `bun run e2e` builds the client first, then checks static serving plus the typed tRPC flow against a temporary inputs file.
+- `bun run e2e` builds the client first, then checks static serving plus the typed oRPC flow against a temporary inputs file.
 - Override the storage file with `INPUTS_FILE` and the port with `PORT` if needed.
 

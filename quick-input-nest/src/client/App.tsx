@@ -2,7 +2,7 @@ import { createSignal, For, Show } from "solid-js";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import type { RouterOutputs } from "../shared/api";
 import { transformInput } from "../shared/transform";
-import { getErrorMessage, trpc } from "./trpc";
+import { getErrorMessage, orpc } from "./orpc";
 
 type InputEntry = RouterOutputs["inputs"]["list"][number];
 
@@ -13,11 +13,11 @@ export default function App() {
 
   const entriesQuery = createQuery(() => ({
     queryKey: ["inputs"],
-    queryFn: () => trpc.inputs.list.query(),
+    queryFn: () => orpc.inputs.list(),
   }));
 
   const addMutation = createMutation(() => ({
-    mutationFn: (value: string) => trpc.inputs.add.mutate({ text: value }),
+    mutationFn: (value: string) => orpc.inputs.add({ text: value }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inputs"] });
       setHighlightFirst(true);
@@ -26,14 +26,14 @@ export default function App() {
   }));
 
   const deleteMutation = createMutation(() => ({
-    mutationFn: (index: number) => trpc.inputs.delete.mutate({ index }),
+    mutationFn: (index: number) => orpc.inputs.delete({ index }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inputs"] });
     },
   }));
 
   const clearMutation = createMutation(() => ({
-    mutationFn: () => trpc.inputs.clear.mutate(),
+    mutationFn: () => orpc.inputs.clear(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inputs"] });
     },

@@ -16,7 +16,7 @@ export default defineConfig({
       host: "127.0.0.1",
     },
     proxy: {
-      "/api/trpc": "http://127.0.0.1:3333",
+      "/api/rpc": "http://127.0.0.1:3333",
     },
   },
 });
