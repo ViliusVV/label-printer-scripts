@@ -21,6 +21,10 @@ export const createAppRouter = (inputs: InputStorageService) =>
           }
           return { ok: true as const };
         }),
+      clear: publicProcedure.mutation(async () => {
+        await inputs.clear();
+        return { ok: true as const };
+      }),
     }),
   });
 

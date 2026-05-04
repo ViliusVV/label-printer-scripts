@@ -2,12 +2,13 @@ import { Inject, Injectable } from "@nestjs/common";
 import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { transformInput } from "../../shared/transform";
 import type { InputItem } from "./input.types";
-import { INPUTS_FILE_PATH, INPUTS_MAX_ITEMS } from "./inputs.constants";
+import { INPUTS_FILE_PATH, INPUTS_MAX_ITEMS, INPUTS_TRANSFORMED_FILE_PATH } from "./inputs.constants";
 
 @Injectable()
 export class InputStorageService {
   constructor(
     @Inject(INPUTS_FILE_PATH) private readonly filePath: string,
+    @Inject(INPUTS_TRANSFORMED_FILE_PATH) private readonly transformedFilePath: string,
     @Inject(INPUTS_MAX_ITEMS) private readonly maxItems: number = 10,
   ) {}
 
@@ -42,7 +43,7 @@ export class InputStorageService {
 
     const transformed = transformInput(trimmed);
     if (transformed !== null) {
-      await appendFile("inputs_transformed.txt", `${transformed}\n`, "utf-8");
+      await appendFile(this.transformedFilePath, `${transformed}\n`, "utf-8");
     } else {
       throw new Error("Cant transform")
     }
@@ -51,6 +52,11 @@ export class InputStorageService {
   async listLatest(): Promise<InputItem[]> {
     const lines = await this.readRawLines();
     return InputStorageService.toIndexedItems(lines).reverse().slice(0, this.maxItems);
+  }
+
+  async clear(): Promise<void> {
+    await writeFile(this.filePath, "", "utf-8");
+    await writeFile(this.transformedFilePath, "", "utf-8");
   }
 
   async deleteByAbsoluteIndex(index: number): Promise<boolean> {

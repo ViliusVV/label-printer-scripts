@@ -14,7 +14,7 @@ const tempDir = await mkdtemp(join(tmpdir(), "quick-input-nest-"));
 const filePath = join(tempDir, "inputs.txt");
 
 try {
-  const storage = new InputStorageService(filePath, 10);
+  const storage = new InputStorageService(filePath, join(tempDir, "transformed.txt"), 10);
   const caller = createAppRouter(storage).createCaller({});
 
   await caller.inputs.add({ text: "  first  " });

@@ -32,6 +32,13 @@ export default function App() {
     },
   }));
 
+  const clearMutation = createMutation(() => ({
+    mutationFn: () => trpc.inputs.clear.mutate(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inputs"] });
+    },
+  }));
+
   const displayEntries = () => entriesQuery.data ?? [];
 
   let inputRef: HTMLInputElement | undefined;
@@ -49,9 +56,14 @@ export default function App() {
     deleteMutation.mutate(index);
   };
 
+  const clearAll = () => {
+    clearMutation.mutate();
+  };
+
   const errorMessage = () => {
     if (addMutation.isError) return getErrorMessage(addMutation.error);
     if (deleteMutation.isError) return getErrorMessage(deleteMutation.error);
+    if (clearMutation.isError) return getErrorMessage(clearMutation.error);
     if (entriesQuery.isError) return getErrorMessage(entriesQuery.error);
     return null;
   };
@@ -109,6 +121,13 @@ export default function App() {
               )}
             </For>
           </ul>
+          <button
+            type="button"
+            class="mt-3 rounded border border-red-300 px-2 py-1 text-sm text-red-700 hover:bg-red-50"
+            onClick={clearAll}
+          >
+            Clear
+          </button>
         </Show>
       </Show>
     </div>
