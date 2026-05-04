@@ -5,10 +5,12 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import { RPCHandler } from "@orpc/server/node";
 import { existsSync } from "node:fs";
 import type { Request, Response } from "express";
+import { createProxyMiddleware } from "http-proxy-middleware";
 import { AppModule } from "./app.module";
-import { CLIENT_DIR, HOST, INDEX_HTML, INPUTS_FILE, PORT } from "./config";
+import { CLIENT_DIR, HOST, INDEX_HTML, INPUTS_FILE, PORT, STREAMLIT_BASE_PATH } from "./config";
 import { InputsController } from "./inputs/inputs.controller";
 import { createAppRouter } from "./orpc/app.router";
+import { StreamlitManagerService } from "./streamlit/streamlit.service";
 
 const log = new Logger("QuickInputNest");
 
@@ -31,10 +33,12 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
   const port = options.port ?? PORT;
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const inputsController = app.get(InputsController);
+  const streamlit = app.get(StreamlitManagerService);
   const expressApp = app.getHttpAdapter().getInstance();
   const rpcHandler = new RPCHandler(createAppRouter(inputsController));
 
   app.enableCors({ origin: true });
+  app.enableShutdownHooks();
 
   if (existsSync(CLIENT_DIR)) {
     app.useStaticAssets(CLIENT_DIR, { index: false });
@@ -49,9 +53,51 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
     next();
   });
 
-  expressApp.get(/^\/(?!api\/rpc(?:\/|$)|assets(?:\/|$)).*/, sendClient);
+  const streamlitProxy = createProxyMiddleware({
+    target: streamlit.target,
+    changeOrigin: true,
+    ws: true,
+    logger: { info: () => {}, warn: log.warn.bind(log), error: log.error.bind(log) },
+  });
+
+  // Mount at root (not `/streamlit`) so Express doesn't strip the prefix —
+  // Streamlit was launched with --server.baseUrlPath=streamlit and 404s
+  // without it.
+  expressApp.use(async (req: Request, res: Response, next: (err?: unknown) => void) => {
+    if (!req.url?.startsWith(`/${STREAMLIT_BASE_PATH}`)) {
+      next();
+      return;
+    }
+    try {
+      await streamlit.ensureStarted();
+    } catch (err) {
+      res.status(502).type("text/plain").send(`Streamlit failed to start: ${(err as Error).message}`);
+      return;
+    }
+    streamlitProxy(req, res, next);
+  });
+
+  expressApp.get(/^\/(?!api\/rpc(?:\/|$)|assets(?:\/|$)|streamlit(?:\/|$)).*/, sendClient);
 
   await app.listen(port, host);
+
+  const httpServer = app.getHttpServer();
+  httpServer.on("upgrade", (req, socket, head) => {
+    if (!req.url?.startsWith(`/${STREAMLIT_BASE_PATH}`)) return;
+    void streamlit
+      .ensureStarted()
+      .then(() => {
+        streamlit.acquire();
+        socket.once("close", () => streamlit.release());
+        // @ts-expect-error -- upgrade method exists on the proxy middleware at runtime
+        streamlitProxy.upgrade(req, socket, head);
+      })
+      .catch((err) => {
+        log.error(`Streamlit upgrade aborted: ${(err as Error).message}`);
+        socket.destroy();
+      });
+  });
+
   log.log(`Quick Input Nest listening on http://${host}:${port} -> writing to ${INPUTS_FILE}`);
   return app;
 }

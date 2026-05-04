@@ -13,3 +13,13 @@ export const CLIENT_DIR = resolve(projectRoot, "dist", "client");
 export const CLIENT_ASSETS_DIR = resolve(CLIENT_DIR, "assets");
 export const INDEX_HTML = resolve(CLIENT_DIR, "index.html");
 
+export const LABEL_PRINTER_DIR = process.env.LABEL_PRINTER_DIR ?? resolve(projectRoot, "..");
+export const STREAMLIT_HOST = process.env.STREAMLIT_HOST ?? "127.0.0.1";
+export const STREAMLIT_PORT = Number.parseInt(process.env.STREAMLIT_PORT ?? "8501", 10);
+export const STREAMLIT_BASE_PATH = process.env.STREAMLIT_BASE_PATH ?? "streamlit";
+export const STREAMLIT_IDLE_MS = Number.parseInt(process.env.STREAMLIT_IDLE_MS ?? "30000", 10);
+export const STREAMLIT_READY_TIMEOUT_MS = Number.parseInt(
+  process.env.STREAMLIT_READY_TIMEOUT_MS ?? "30000",
+  10,
+);
+

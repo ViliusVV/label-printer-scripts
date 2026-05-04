@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
+import { RouterProvider } from "@tanstack/solid-router";
 import { render } from "solid-js/web";
-import App from "./App";
+import { router } from "./router";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -15,9 +16,8 @@ if (!root) throw new Error("#root not found");
 render(
   () => (
     <QueryClientProvider client={queryClient}>
-      <App />
+      <RouterProvider router={router} />
     </QueryClientProvider>
   ),
   root,
 );
-

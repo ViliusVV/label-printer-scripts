@@ -42,10 +42,14 @@ export default defineConfig(async () => ({
       },
       workbox: {
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/streamlit\//],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith("/api/rpc"),
+            handler: "NetworkOnly",
+          },
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith("/streamlit"),
             handler: "NetworkOnly",
           },
         ],
@@ -62,6 +66,11 @@ export default defineConfig(async () => ({
     https: await ensureCert(),
     proxy: {
       "/api/rpc": "http://127.0.0.1:3333",
+      "/streamlit": {
+        target: "http://127.0.0.1:3333",
+        ws: true,
+        changeOrigin: true,
+      },
     },
   },
 }));

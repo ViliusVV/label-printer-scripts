@@ -1,12 +1,12 @@
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { createMutation, createQuery, onlineManager, useQueryClient } from "@tanstack/solid-query";
-import { transformInput } from "../shared/transform";
-import { DebugHeader } from "./DebugHeader";
-import { getErrorMessage } from "./orpc";
-import * as sync from "./sync";
-import type { DisplayEntry } from "./sync";
+import { transformInput } from "../../shared/transform";
+import { DebugHeader } from "../DebugHeader";
+import { getErrorMessage } from "../orpc";
+import * as sync from "../sync";
+import type { DisplayEntry } from "../sync";
 
-export default function App() {
+export default function InputPage() {
   const queryClient = useQueryClient();
   const [text, setText] = createSignal("");
   const [highlightFirst, setHighlightFirst] = createSignal(false);
