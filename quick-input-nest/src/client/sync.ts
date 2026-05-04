@@ -7,6 +7,21 @@ import type { OutboxOp, ServerEntry } from "./storage/opfs";
 const [lastServerSyncAtSignal, setLastServerSyncAt] = createSignal(0);
 export const lastServerSyncAt = lastServerSyncAtSignal;
 
+export type SyncError = { message: string; source: string; at: number };
+const [lastErrorSignal, setLastErrorInternal] = createSignal<SyncError | null>(null);
+export const lastError = lastErrorSignal;
+export const clearLastError = (): void => {
+  setLastErrorInternal(null);
+};
+const recordError = (source: string, err: unknown): void => {
+  const message = err instanceof Error ? err.message : String(err);
+  setLastErrorInternal({ message, source, at: Date.now() });
+};
+
+export type ReplayResult = { replayed: number; remaining: number; at: number };
+const [lastReplaySignal, setLastReplay] = createSignal<ReplayResult | null>(null);
+export const lastReplay = lastReplaySignal;
+
 export type DisplayEntry = ServerEntry & {
   pending?: boolean;
   outboxId?: string;
@@ -77,10 +92,16 @@ export async function replayOutbox(): Promise<void> {
         remaining.push(...ops.slice(i));
         break;
       }
+      recordError(`replay:${op.kind}`, err);
     }
   }
 
   await storage.writeOutbox(remaining);
+  setLastReplay({
+    replayed: ops.length - remaining.length,
+    remaining: remaining.length,
+    at: Date.now(),
+  });
 }
 
 export async function fetchView(): Promise<DisplayEntry[]> {
@@ -88,9 +109,13 @@ export async function fetchView(): Promise<DisplayEntry[]> {
     await replayOutbox();
     const fresh = await orpc.inputs.list();
     await storage.writeCache(fresh);
+    setLastServerSyncAt(Date.now());
     return applyOutbox(fresh, await storage.readOutbox());
   } catch (err) {
-    if (!isNetworkError(err)) throw err;
+    if (!isNetworkError(err)) {
+      recordError("fetchView", err);
+      throw err;
+    }
     const [cache, outbox] = await Promise.all([storage.readCache(), storage.readOutbox()]);
     return applyOutbox(cache, outbox);
   }

@@ -1,10 +1,27 @@
+import { execSync } from "node:child_process";
 import { defineConfig } from "vite";
 import solid from "vite-plugin-solid";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { ensureCert } from "./scripts/generate-cert";
 
-export default defineConfig({
+const buildHash = (() => {
+  try {
+    return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  } catch {
+    return "unknown";
+  }
+})();
+const buildTime = new Date().toISOString();
+
+export default defineConfig(async () => ({
   root: "src/client",
+  define: {
+    __BUILD_HASH__: JSON.stringify(buildHash),
+    __BUILD_TIME__: JSON.stringify(buildTime),
+  },
   plugins: [
     solid(),
     tailwindcss(),
@@ -42,6 +59,7 @@ export default defineConfig({
   server: {
     port: 5174,
     host: "0.0.0.0",
+    https: await ensureCert(),
     hmr: {
       host: "127.0.0.1",
     },
@@ -49,4 +67,4 @@ export default defineConfig({
       "/api/rpc": "http://127.0.0.1:3333",
     },
   },
-});
+}));

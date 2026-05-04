@@ -1,6 +1,7 @@
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { createMutation, createQuery, onlineManager, useQueryClient } from "@tanstack/solid-query";
 import { transformInput } from "../shared/transform";
+import { DebugHeader } from "./DebugHeader";
 import { getErrorMessage } from "./orpc";
 import * as sync from "./sync";
 import type { DisplayEntry } from "./sync";
@@ -49,6 +50,7 @@ export default function App() {
 
   const displayEntries = (): DisplayEntry[] => entriesQuery.data ?? [];
   const pendingCount = () => displayEntries().filter((e) => e.pending).length;
+  const cacheCount = () => displayEntries().filter((e) => !e.pending).length;
 
   const isInvalid = () => {
     const trimmed = text().trim();
@@ -85,6 +87,15 @@ export default function App() {
 
   return (
     <div class="mx-auto max-w-xl p-4 text-gray-900">
+      <DebugHeader
+        online={isOnline()}
+        cacheCount={cacheCount()}
+        pendingCount={pendingCount()}
+        lastSyncAt={sync.lastServerSyncAt()}
+        lastReplay={sync.lastReplay()}
+        lastError={sync.lastError()}
+      />
+
       <Show when={!isOnline() || pendingCount() > 0}>
         <div class="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           <Show when={!isOnline()} fallback={`${pendingCount()} pending — syncing…`}>

@@ -10,7 +10,8 @@
     "build": "bun run check; vite build",
     "start": "bun run src/server/main.ts",
     "smoke": "bun run scripts/smoke.ts",
-    "e2e": "bun run build; bun run scripts/e2e.ts"
+    "e2e": "bun run build; bun run scripts/e2e.ts",
+    "cert": "bun run scripts/generate-cert.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
@@ -31,9 +32,11 @@
     "@types/bun": "^1.3.13",
     "@types/express": "^5.0.3",
     "@types/node": "^25.6.0",
+    "@types/selfsigned": "^2.1.0",
     "@types/supertest": "^6.0.3",
     "concurrently": "^9",
     "playwright": "^1.59.1",
+    "selfsigned": "^5.5.0",
     "supertest": "^7.1.4",
     "tailwindcss": "^4",
     "typescript": "^5",

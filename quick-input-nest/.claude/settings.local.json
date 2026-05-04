@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun add *)",
+      "Bash(bun run *)",
+      "Bash(bun -e \"console.log\\('argv[1]:', process.argv[1]\\); console.log\\('url:', import.meta.url\\);\")"
+    ]
+  }
+}
