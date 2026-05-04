@@ -32,7 +32,6 @@ aaa
 666
 888
 000
-rrr
 hhh
 bbb
 r44

@@ -66,9 +66,13 @@ export function DebugHeader(props: Props) {
   });
 
   return (
-    <div class="mb-3 rounded border border-gray-200 bg-gray-50 px-3 py-1.5 font-mono text-xs text-gray-600">
+    <div class="mb-3 rounded border border-gray-200 bg-gray-50 px-3 py-1.5 font-mono text-xs text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span class={props.online ? "text-green-700" : "text-amber-700"}>
+        <span
+          class={
+            props.online ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-400"
+          }
+        >
           {props.online ? "● online" : "○ offline"}
         </span>
         <span>cache: {props.cacheCount}</span>
@@ -97,13 +101,13 @@ export function DebugHeader(props: Props) {
       </div>
       <Show when={props.lastError}>
         {(err) => (
-          <div class="mt-1 flex items-start gap-2 text-red-700">
+          <div class="mt-1 flex items-start gap-2 text-red-700 dark:text-red-300">
             <span class="break-all">
               err [{err().source}, {formatAgo(now(), err().at)}]: {err().message}
             </span>
             <button
               type="button"
-              class="rounded border border-red-300 px-1.5 text-[10px] hover:bg-red-50"
+              class="rounded border border-red-300 px-1.5 text-[10px] hover:bg-red-50 dark:border-red-800/60 dark:hover:bg-red-950/40"
               onClick={clearLastError}
             >
               clear

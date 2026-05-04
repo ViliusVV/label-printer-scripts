@@ -25,7 +25,8 @@
       "Bash(node --experimental-strip-types scripts/adhoc/upgrade-echo.ts)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "Bash(NODE_TLS_REJECT_UNAUTHORIZED=0 bun run scripts/adhoc/ws-probe.ts wss://localhost:5174/streamlit/_stcore/stream)"
+      "Bash(NODE_TLS_REJECT_UNAUTHORIZED=0 bun run scripts/adhoc/ws-probe.ts wss://localhost:5174/streamlit/_stcore/stream)",
+      "Bash(gh release *)"
     ]
   }
 }

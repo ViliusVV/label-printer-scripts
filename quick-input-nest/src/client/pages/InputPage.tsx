@@ -86,7 +86,7 @@ export default function InputPage() {
   };
 
   return (
-    <div class="mx-auto max-w-xl p-4 text-gray-900">
+    <div class="mx-auto max-w-xl p-4 text-gray-900 dark:text-gray-100">
       <DebugHeader
         online={isOnline()}
         cacheCount={cacheCount()}
@@ -97,7 +97,7 @@ export default function InputPage() {
       />
 
       <Show when={!isOnline() || pendingCount() > 0}>
-        <div class="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <div class="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
           <Show when={!isOnline()} fallback={`${pendingCount()} pending — syncing…`}>
             Offline · changes will sync when reconnected
             <Show when={pendingCount() > 0}> ({pendingCount()} queued)</Show>
@@ -116,28 +116,35 @@ export default function InputPage() {
           autocorrect="off"
           spellcheck={false}
           placeholder="Type and press Enter"
-          class="flex-1 rounded-lg border-2 px-3 py-3 text-2xl outline-none"
+          class="flex-1 rounded-lg border-2 bg-white px-3 py-3 text-2xl text-gray-900 outline-none placeholder:text-gray-400 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
           classList={{
-            "border-gray-300 focus:border-blue-600": !isInvalid(),
-            "border-red-500 focus:border-red-600": isInvalid(),
+            "border-gray-300 focus:border-blue-600 dark:border-gray-700 dark:focus:border-blue-500":
+              !isInvalid(),
+            "border-red-500 focus:border-red-600 dark:border-red-500 dark:focus:border-red-400":
+              isInvalid(),
           }}
         />
       </form>
 
       <Show when={errorMessage()}>
         {(message) => (
-          <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/60 dark:bg-red-950/40 dark:text-red-300">
             {message()}
           </div>
         )}
       </Show>
 
-      <Show when={!entriesQuery.isLoading} fallback={<div class="px-3 py-2 text-gray-500">Loading…</div>}>
+      <Show
+        when={!entriesQuery.isLoading}
+        fallback={<div class="px-3 py-2 text-gray-500 dark:text-gray-400">Loading…</div>}
+      >
         <Show
           when={displayEntries().length > 0}
-          fallback={<div class="px-3 py-2 italic text-gray-500">No entries yet</div>}
+          fallback={
+            <div class="px-3 py-2 italic text-gray-500 dark:text-gray-400">No entries yet</div>
+          }
         >
-          <ul class="divide-y divide-gray-200">
+          <ul class="divide-y divide-gray-200 dark:divide-gray-800">
             <For each={displayEntries()}>
               {(entry, i) => (
                 <li
@@ -148,11 +155,13 @@ export default function InputPage() {
                   }}
                 >
                   <span class="truncate text-lg">{transformInput(entry.text) ?? entry.text}</span>
-                  <span class="block text-sm text-gray-500 mt-1">{entry.text}</span>
+                  <span class="block text-sm text-gray-500 mt-1 dark:text-gray-400">
+                    {entry.text}
+                  </span>
 
                   <button
                     type="button"
-                    class="rounded border border-red-300 px-2 py-1 text-sm text-red-700 hover:bg-red-50"
+                    class="rounded border border-red-300 px-2 py-1 text-sm text-red-700 hover:bg-red-50 dark:border-red-800/60 dark:text-red-300 dark:hover:bg-red-950/40"
                     onClick={() => remove(entry)}
                   >
                     Delete
@@ -163,7 +172,7 @@ export default function InputPage() {
           </ul>
           <button
             type="button"
-            class="mt-3 rounded border border-red-300 px-2 py-1 text-sm text-red-700 hover:bg-red-50"
+            class="mt-3 rounded border border-red-300 px-2 py-1 text-sm text-red-700 hover:bg-red-50 dark:border-red-800/60 dark:text-red-300 dark:hover:bg-red-950/40"
             onClick={clearAll}
           >
             Clear
