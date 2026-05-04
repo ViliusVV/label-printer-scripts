@@ -1,23 +1,31 @@
-import { createSignal, For, Show } from "solid-js";
-import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import type { RouterOutputs } from "../shared/api";
+import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createMutation, createQuery, onlineManager, useQueryClient } from "@tanstack/solid-query";
 import { transformInput } from "../shared/transform";
-import { getErrorMessage, orpc } from "./orpc";
-
-type InputEntry = RouterOutputs["inputs"]["list"][number];
+import { getErrorMessage } from "./orpc";
+import * as sync from "./sync";
+import type { DisplayEntry } from "./sync";
 
 export default function App() {
   const queryClient = useQueryClient();
   const [text, setText] = createSignal("");
   const [highlightFirst, setHighlightFirst] = createSignal(false);
+  const [isOnline, setIsOnline] = createSignal(onlineManager.isOnline());
 
   const entriesQuery = createQuery(() => ({
     queryKey: ["inputs"],
-    queryFn: () => orpc.inputs.list(),
+    queryFn: () => sync.fetchView(),
   }));
 
+  onMount(() => {
+    const unsubscribe = onlineManager.subscribe((online) => {
+      setIsOnline(online);
+      if (online) queryClient.invalidateQueries({ queryKey: ["inputs"] });
+    });
+    onCleanup(unsubscribe);
+  });
+
   const addMutation = createMutation(() => ({
-    mutationFn: (value: string) => orpc.inputs.add({ text: value }),
+    mutationFn: (value: string) => sync.addEntry(value),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inputs"] });
       setHighlightFirst(true);
@@ -26,20 +34,21 @@ export default function App() {
   }));
 
   const deleteMutation = createMutation(() => ({
-    mutationFn: (index: number) => orpc.inputs.delete({ index }),
+    mutationFn: (entry: DisplayEntry) => sync.deleteEntry(entry),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inputs"] });
     },
   }));
 
   const clearMutation = createMutation(() => ({
-    mutationFn: () => orpc.inputs.clear(),
+    mutationFn: () => sync.clearEntries(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inputs"] });
     },
   }));
 
-  const displayEntries = () => entriesQuery.data ?? [];
+  const displayEntries = (): DisplayEntry[] => entriesQuery.data ?? [];
+  const pendingCount = () => displayEntries().filter((e) => e.pending).length;
 
   const isInvalid = () => {
     const trimmed = text().trim();
@@ -58,8 +67,8 @@ export default function App() {
     addMutation.mutate(value);
   };
 
-  const remove = (index: number) => {
-    deleteMutation.mutate(index);
+  const remove = (entry: DisplayEntry) => {
+    deleteMutation.mutate(entry);
   };
 
   const clearAll = () => {
@@ -76,6 +85,15 @@ export default function App() {
 
   return (
     <div class="mx-auto max-w-xl p-4 text-gray-900">
+      <Show when={!isOnline() || pendingCount() > 0}>
+        <div class="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <Show when={!isOnline()} fallback={`${pendingCount()} pending — syncing…`}>
+            Offline · changes will sync when reconnected
+            <Show when={pendingCount() > 0}> ({pendingCount()} queued)</Show>
+          </Show>
+        </div>
+      </Show>
+
       <form onSubmit={submit} autocomplete="off" class="mb-4 flex gap-2">
         <input
           ref={inputRef}
@@ -115,6 +133,7 @@ export default function App() {
                   classList={{
                     "px-3 py-3 text-lg rounded flex items-center justify-between gap-3": true,
                     "animate-flash": highlightFirst() && i() === 0,
+                    "opacity-60 italic": entry.pending,
                   }}
                 >
                   <span class="truncate text-lg">{transformInput(entry.text) ?? entry.text}</span>
@@ -123,7 +142,7 @@ export default function App() {
                   <button
                     type="button"
                     class="rounded border border-red-300 px-2 py-1 text-sm text-red-700 hover:bg-red-50"
-                    onClick={() => remove(entry.index)}
+                    onClick={() => remove(entry)}
                   >
                     Delete
                   </button>

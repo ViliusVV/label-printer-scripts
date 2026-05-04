@@ -6,7 +6,7 @@ import { RPCHandler } from "@orpc/server/node";
 import { existsSync } from "node:fs";
 import type { Request, Response } from "express";
 import { AppModule } from "./app.module";
-import { CLIENT_ASSETS_DIR, HOST, INDEX_HTML, INPUTS_FILE, PORT } from "./config";
+import { CLIENT_DIR, HOST, INDEX_HTML, INPUTS_FILE, PORT } from "./config";
 import { InputsController } from "./inputs/inputs.controller";
 import { createAppRouter } from "./orpc/app.router";
 
@@ -35,6 +35,10 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
   const rpcHandler = new RPCHandler(createAppRouter(inputsController));
 
   app.enableCors({ origin: true });
+
+  if (existsSync(CLIENT_DIR)) {
+    app.useStaticAssets(CLIENT_DIR, { index: false });
+  }
 
   expressApp.use("/api/rpc{*path}", async (req: Request, res: Response, next: () => void) => {
     const { matched } = await rpcHandler.handle(req, res, {
