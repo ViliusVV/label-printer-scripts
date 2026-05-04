@@ -39,14 +39,14 @@ export class InputStorageService {
   async add(text: string): Promise<void> {
     const trimmed = text.trim();
     if (!trimmed) return;
-    await appendFile(this.filePath, `${trimmed}\n`, "utf-8");
 
     const transformed = transformInput(trimmed);
-    if (transformed !== null) {
-      await appendFile(this.transformedFilePath, `${transformed}\n`, "utf-8");
-    } else {
-      throw new Error("Cant transform")
+    if (transformed === null) {
+      throw new Error("Cant transform");
     }
+
+    await appendFile(this.filePath, `${trimmed}\n`, "utf-8");
+    await appendFile(this.transformedFilePath, `${transformed}\n`, "utf-8");
   }
 
   async listLatest(): Promise<InputItem[]> {
