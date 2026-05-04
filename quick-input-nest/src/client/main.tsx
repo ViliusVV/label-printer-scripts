@@ -5,8 +5,8 @@ import "./index.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { networkMode: "always" },
-    mutations: { networkMode: "always" },
+    queries: { networkMode: "offlineFirst" },
+    mutations: { networkMode: "offlineFirst" },
   },
 });
 
