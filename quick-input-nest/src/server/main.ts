@@ -37,18 +37,14 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
   app.enableCors({ origin: true });
 
   expressApp.use(
-    "/trpc",
+    "/api/trpc",
     createExpressMiddleware({
       router: appRouter,
       createContext: () => ({}),
     }),
   );
 
-  if (existsSync(CLIENT_ASSETS_DIR)) {
-    app.useStaticAssets(CLIENT_ASSETS_DIR, { prefix: "/assets" });
-  }
-
-  expressApp.get(/^\/(?!trpc(?:\/|$)|assets(?:\/|$)).*/, sendClient);
+  expressApp.get(/^\/(?!api\/trpc(?:\/|$)|assets(?:\/|$)).*/, sendClient);
 
   await app.listen(port, host);
   log.log(`Quick Input Nest listening on http://${host}:${port} -> writing to ${INPUTS_FILE}`);

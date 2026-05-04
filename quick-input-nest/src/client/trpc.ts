@@ -4,7 +4,7 @@ import type { AppRouter } from "../shared/api";
 export const trpc = createTRPCProxyClient<AppRouter>({
   links: [
     httpBatchLink({
-      url: `${window.location.origin}/trpc`,
+      url: `${window.location.origin}/api/trpc`,
     }),
   ],
 });
