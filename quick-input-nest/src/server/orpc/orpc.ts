@@ -1,11 +1,6 @@
 import { ORPCError, os } from "@orpc/server";
-import type { InputStorageService } from "../inputs/input-storage.service";
 
-export type ORPCContext = {
-  inputs: InputStorageService;
-};
-
-export const base = os.$context<ORPCContext>().use(async ({ next }) => {
+export const base = os.use(async ({ next }) => {
   try {
     return await next();
   } catch (err) {

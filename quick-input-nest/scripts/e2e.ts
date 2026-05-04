@@ -15,8 +15,8 @@ const filePath = join(tempDir, "inputs.txt");
 
 process.env.INPUTS_FILE = filePath;
 
-const [{ InputStorageService }, { bootstrap }, { appRouter }] = await Promise.all([
-  import("../src/server/inputs/input-storage.service"),
+const [{ InputsController }, { bootstrap }, { createAppRouter }] = await Promise.all([
+  import("../src/server/inputs/inputs.controller"),
   import("../src/server/main"),
   import("../src/server/orpc/app.router"),
 ]);
@@ -30,8 +30,8 @@ try {
   assert(root.status === 200, `Expected root route to succeed, got ${root.status}`);
   assert(root.text.includes("<div id=\"root\"></div>"), "Expected built client index.html");
 
-  const storage = app.get(InputStorageService);
-  const client = createRouterClient(appRouter, { context: { inputs: storage } });
+  const controller = app.get(InputsController);
+  const client = createRouterClient(createAppRouter(controller));
 
   await client.inputs.add({ text: "nest-e2e-entry" });
 

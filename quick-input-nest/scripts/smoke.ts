@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createRouterClient } from "@orpc/server";
 import { InputStorageService } from "../src/server/inputs/input-storage.service";
-import { appRouter } from "../src/server/orpc/app.router";
+import { InputsController } from "../src/server/inputs/inputs.controller";
+import { createAppRouter } from "../src/server/orpc/app.router";
 
 const assert = (condition: unknown, message: string): void => {
   if (!condition) {
@@ -16,7 +17,8 @@ const filePath = join(tempDir, "inputs.txt");
 
 try {
   const storage = new InputStorageService(filePath, join(tempDir, "transformed.txt"), 10);
-  const client = createRouterClient(appRouter, { context: { inputs: storage } });
+  const controller = new InputsController(storage);
+  const client = createRouterClient(createAppRouter(controller));
 
   await client.inputs.add({ text: "  first  " });
   await client.inputs.add({ text: "   " });

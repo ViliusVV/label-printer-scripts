@@ -7,8 +7,8 @@ import { existsSync } from "node:fs";
 import type { Request, Response } from "express";
 import { AppModule } from "./app.module";
 import { CLIENT_ASSETS_DIR, HOST, INDEX_HTML, INPUTS_FILE, PORT } from "./config";
-import { InputStorageService } from "./inputs/input-storage.service";
-import { appRouter } from "./orpc/app.router";
+import { InputsController } from "./inputs/inputs.controller";
+import { createAppRouter } from "./orpc/app.router";
 
 const log = new Logger("QuickInputNest");
 
@@ -30,16 +30,16 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
   const host = options.host ?? HOST;
   const port = options.port ?? PORT;
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  const inputs = app.get(InputStorageService);
+  const inputsController = app.get(InputsController);
   const expressApp = app.getHttpAdapter().getInstance();
-  const rpcHandler = new RPCHandler(appRouter);
+  const rpcHandler = new RPCHandler(createAppRouter(inputsController));
 
   app.enableCors({ origin: true });
 
   expressApp.use("/api/rpc{*path}", async (req: Request, res: Response, next: () => void) => {
     const { matched } = await rpcHandler.handle(req, res, {
       prefix: "/api/rpc",
-      context: { inputs },
+      context: {},
     });
     if (matched) return;
     next();
