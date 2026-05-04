@@ -3,7 +3,11 @@
     "allow": [
       "Bash(bun add *)",
       "Bash(bun run *)",
-      "Bash(bun -e \"console.log\\('argv[1]:', process.argv[1]\\); console.log\\('url:', import.meta.url\\);\")"
+      "Bash(bun -e \"console.log\\('argv[1]:', process.argv[1]\\); console.log\\('url:', import.meta.url\\);\")",
+      "Bash(bun -e \"import { ensureCert } from './scripts/generate-cert.ts'; await ensureCert\\(\\);\")",
+      "Bash(bun -e \"console.log\\('start'\\); const m = await import\\('./scripts/generate-cert.ts'\\); console.log\\('imported', Object.keys\\(m\\)\\); try { const r = await m.ensureCert\\(\\); console.log\\('done', r.cert.slice\\(0, 30\\)\\); } catch \\(e\\) { console.error\\('FAIL', e\\); }\")",
+      "Bash(bun -e \"import {readdirSync, existsSync, statSync} from 'node:fs'; console.log\\('certs exists:', existsSync\\('certs'\\)\\); if \\(existsSync\\('certs'\\)\\) { console.log\\(readdirSync\\('certs'\\)\\); for \\(const f of readdirSync\\('certs'\\)\\) { console.log\\(f, statSync\\('certs/' + f\\).size\\); } }\")",
+      "Bash(bun -e \"import {rmSync} from 'node:fs'; rmSync\\('certs', {recursive: true, force: true}\\); console.log\\('cleared'\\);\")"
     ]
   }
 }

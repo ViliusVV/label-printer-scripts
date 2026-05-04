@@ -60,9 +60,6 @@ export default defineConfig(async () => ({
     port: 5174,
     host: "0.0.0.0",
     https: await ensureCert(),
-    hmr: {
-      host: "127.0.0.1",
-    },
     proxy: {
       "/api/rpc": "http://127.0.0.1:3333",
     },
