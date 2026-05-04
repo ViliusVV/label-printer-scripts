@@ -18,7 +18,11 @@
       "Bash(taskkill //F //IM python.exe)",
       "Bash(taskkill //F //IM node.exe)",
       "Bash(STREAMLIT_IDLE_MS=5000 bun run dev:server)",
-      "Bash(STREAMLIT_IDLE_MS=5000 bun run dev)"
+      "Bash(STREAMLIT_IDLE_MS=5000 bun run dev)",
+      "Bash(DEBUG=\"http-proxy-middleware*\" bun run dev)",
+      "Bash(NODE_TLS_REJECT_UNAUTHORIZED=0 bun run scripts/ws-probe.ts)",
+      "Bash(bun --version)",
+      "Bash(node --experimental-strip-types scripts/adhoc/upgrade-echo.ts)"
     ]
   }
 }

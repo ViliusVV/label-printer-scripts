@@ -5,9 +5,19 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import { RPCHandler } from "@orpc/server/node";
 import { existsSync } from "node:fs";
 import type { Request, Response } from "express";
-import { createProxyMiddleware } from "http-proxy-middleware";
+import httpProxy from "http-proxy";
+import { connect as netConnect } from "node:net";
 import { AppModule } from "./app.module";
-import { CLIENT_DIR, HOST, INDEX_HTML, INPUTS_FILE, PORT, STREAMLIT_BASE_PATH } from "./config";
+import {
+  CLIENT_DIR,
+  HOST,
+  INDEX_HTML,
+  INPUTS_FILE,
+  PORT,
+  STREAMLIT_BASE_PATH,
+  STREAMLIT_HOST,
+  STREAMLIT_PORT,
+} from "./config";
 import { InputsController } from "./inputs/inputs.controller";
 import { createAppRouter } from "./orpc/app.router";
 import { StreamlitManagerService } from "./streamlit/streamlit.service";
@@ -53,12 +63,12 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
     next();
   });
 
-  const streamlitProxy = createProxyMiddleware({
+  const streamlitProxy = httpProxy.createProxyServer({
     target: streamlit.target,
     changeOrigin: true,
     ws: true,
-    logger: { info: () => {}, warn: log.warn.bind(log), error: log.error.bind(log) },
   });
+  streamlitProxy.on("error", (err) => log.error(`proxy error: ${err.message}`));
 
   // Mount at root (not `/streamlit`) so Express doesn't strip the prefix —
   // Streamlit was launched with --server.baseUrlPath=streamlit and 404s
@@ -74,13 +84,17 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
       res.status(502).type("text/plain").send(`Streamlit failed to start: ${(err as Error).message}`);
       return;
     }
-    streamlitProxy(req, res, next);
+    streamlitProxy.web(req, res);
   });
 
   expressApp.get(/^\/(?!api\/rpc(?:\/|$)|assets(?:\/|$)|streamlit(?:\/|$)).*/, sendClient);
 
   await app.listen(port, host);
 
+  // Forward WS upgrades to Streamlit at the TCP level — re-emit the HTTP
+  // upgrade request line + headers verbatim, then pipe both directions.
+  // Avoids http-proxy's interaction with Bun's http server which silently
+  // dropped the upgrade.
   const httpServer = app.getHttpServer();
   httpServer.on("upgrade", (req, socket, head) => {
     if (!req.url?.startsWith(`/${STREAMLIT_BASE_PATH}`)) return;
@@ -88,9 +102,46 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
       .ensureStarted()
       .then(() => {
         streamlit.acquire();
-        socket.once("close", () => streamlit.release());
-        // @ts-expect-error -- upgrade method exists on the proxy middleware at runtime
-        streamlitProxy.upgrade(req, socket, head);
+        let released = false;
+        const release = () => {
+          if (released) return;
+          released = true;
+          streamlit.release();
+        };
+
+        const upstream = netConnect(STREAMLIT_PORT, STREAMLIT_HOST, () => {
+          const headerLines = [`${req.method} ${req.url} HTTP/${req.httpVersion}`];
+          for (let i = 0; i < req.rawHeaders.length; i += 2) {
+            headerLines.push(`${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}`);
+          }
+          headerLines.push("", "");
+          const reqBytes = headerLines.join("\r\n");
+          log.log(`upstream connected, sending ${reqBytes.length} bytes:\n${reqBytes}`);
+          upstream.write(reqBytes);
+          if (head && head.length > 0) upstream.write(head);
+          upstream.on("data", (b) =>
+            log.log(`upstream → client ${b.length} bytes: ${b.slice(0, 200).toString()}`),
+          );
+          socket.on("data", (b) => log.log(`client → upstream ${b.length} bytes`));
+          upstream.pipe(socket);
+          socket.pipe(upstream);
+        });
+
+        const teardown = () => {
+          upstream.destroy();
+          socket.destroy();
+          release();
+        };
+        upstream.on("error", (err) => {
+          log.error(`upstream WS error: ${err.message}`);
+          teardown();
+        });
+        socket.on("error", (err) => {
+          log.warn(`client WS error: ${err.message}`);
+          teardown();
+        });
+        upstream.on("close", teardown);
+        socket.on("close", teardown);
       })
       .catch((err) => {
         log.error(`Streamlit upgrade aborted: ${(err as Error).message}`);
