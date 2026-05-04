@@ -26,7 +26,8 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "Bash(NODE_TLS_REJECT_UNAUTHORIZED=0 bun run scripts/adhoc/ws-probe.ts wss://localhost:5174/streamlit/_stcore/stream)",
-      "Bash(gh release *)"
+      "Bash(gh release *)",
+      "Bash(node --import @swc-node/register/esm-register scripts/adhoc/sqlite-blob-roundtrip.ts)"
     ]
   }
 }

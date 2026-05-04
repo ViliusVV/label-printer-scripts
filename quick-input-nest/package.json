@@ -19,6 +19,7 @@
     "@nestjs/platform-express": "^11.0.0",
     "@orpc/client": "^1.0.0",
     "@orpc/server": "^1.0.0",
+    "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
     "@tanstack/solid-query": "^5.100.9",
     "@tanstack/solid-router": "^1.169.1",
     "express": "^5.1.0",

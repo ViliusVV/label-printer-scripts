@@ -7,6 +7,10 @@ export function createAppRouter(inputs: InputsController) {
       add: inputs.add,
       delete: inputs.delete,
       clear: inputs.clear,
+      sync: {
+        download: inputs.syncDownload,
+        upload: inputs.syncUpload,
+      },
     },
   };
 }

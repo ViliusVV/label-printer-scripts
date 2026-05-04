@@ -3,3 +3,9 @@ export type InputItem = {
   text: string;
 };
 
+export type SyncedItem = {
+  index: number;
+  text: string;
+  transformed: string;
+};
+

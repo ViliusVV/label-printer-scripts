@@ -11,6 +11,7 @@ export default function RootLayout() {
             Quick Input
           </span>
           <NavLink to="/">Input</NavLink>
+          <NavLink to="/sqlite">Inputs|SQLite</NavLink>
           <NavLink to="/print">Print</NavLink>
           <div class="ml-auto">
             <ThemeToggle />

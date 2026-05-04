@@ -2,6 +2,7 @@ import { createRootRoute, createRoute, createRouter } from "@tanstack/solid-rout
 import RootLayout from "./RootLayout";
 import InputPage from "./pages/InputPage";
 import PrintPage from "./pages/PrintPage";
+import SqlitePage from "./pages/SqlitePage";
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -13,13 +14,19 @@ const indexRoute = createRoute({
   component: InputPage,
 });
 
+const sqliteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/sqlite",
+  component: SqlitePage,
+});
+
 const printRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/print",
   component: PrintPage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, printRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, sqliteRoute, printRoute]);
 
 export const router = createRouter({ routeTree });
 

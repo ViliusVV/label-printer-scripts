@@ -30,4 +30,29 @@ export class InputsController {
     await this.inputs.clear();
     return { ok: true as const };
   });
+
+  syncDownload = base.handler(async () => {
+    const buffer = await this.inputs.exportBlob();
+    return { blob: buffer.toString("base64"), bytes: buffer.byteLength };
+  });
+
+  syncUpload = base
+    .input(z.object({ blob: z.string() }))
+    .handler(async ({ input }) => {
+      let bytes: Buffer;
+      try {
+        bytes = Buffer.from(input.blob, "base64");
+      } catch {
+        throw new ORPCError("BAD_REQUEST", { message: "Invalid base64 blob" });
+      }
+      try {
+        const count = await this.inputs.importBlob(bytes);
+        return { ok: true as const, count };
+      } catch (err) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: err instanceof Error ? err.message : "Failed to import SQLite blob",
+          cause: err,
+        });
+      }
+    });
 }
