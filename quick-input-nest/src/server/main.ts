@@ -4,20 +4,11 @@ import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { RPCHandler } from "@orpc/server/node";
 import { existsSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import type { Request, Response } from "express";
 import httpProxy from "http-proxy";
-import { connect as netConnect } from "node:net";
 import { AppModule } from "./app.module";
-import {
-  CLIENT_DIR,
-  HOST,
-  INDEX_HTML,
-  INPUTS_FILE,
-  PORT,
-  STREAMLIT_BASE_PATH,
-  STREAMLIT_HOST,
-  STREAMLIT_PORT,
-} from "./config";
+import { CLIENT_DIR, HOST, INDEX_HTML, INPUTS_FILE, PORT, STREAMLIT_BASE_PATH } from "./config";
 import { InputsController } from "./inputs/inputs.controller";
 import { createAppRouter } from "./orpc/app.router";
 import { StreamlitManagerService } from "./streamlit/streamlit.service";
@@ -91,10 +82,9 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
 
   await app.listen(port, host);
 
-  // Forward WS upgrades to Streamlit at the TCP level — re-emit the HTTP
-  // upgrade request line + headers verbatim, then pipe both directions.
-  // Avoids http-proxy's interaction with Bun's http server which silently
-  // dropped the upgrade.
+  // Forward WS upgrades to Streamlit. Tracks active sessions so the manager
+  // can shut Streamlit down once the iframe closes. NOTE: needs Node runtime
+  // — Bun's node:http drops socket.write after upgrade (oven-sh/bun#28396).
   const httpServer = app.getHttpServer();
   httpServer.on("upgrade", (req, socket, head) => {
     if (!req.url?.startsWith(`/${STREAMLIT_BASE_PATH}`)) return;
@@ -102,46 +92,8 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
       .ensureStarted()
       .then(() => {
         streamlit.acquire();
-        let released = false;
-        const release = () => {
-          if (released) return;
-          released = true;
-          streamlit.release();
-        };
-
-        const upstream = netConnect(STREAMLIT_PORT, STREAMLIT_HOST, () => {
-          const headerLines = [`${req.method} ${req.url} HTTP/${req.httpVersion}`];
-          for (let i = 0; i < req.rawHeaders.length; i += 2) {
-            headerLines.push(`${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}`);
-          }
-          headerLines.push("", "");
-          const reqBytes = headerLines.join("\r\n");
-          log.log(`upstream connected, sending ${reqBytes.length} bytes:\n${reqBytes}`);
-          upstream.write(reqBytes);
-          if (head && head.length > 0) upstream.write(head);
-          upstream.on("data", (b) =>
-            log.log(`upstream → client ${b.length} bytes: ${b.slice(0, 200).toString()}`),
-          );
-          socket.on("data", (b) => log.log(`client → upstream ${b.length} bytes`));
-          upstream.pipe(socket);
-          socket.pipe(upstream);
-        });
-
-        const teardown = () => {
-          upstream.destroy();
-          socket.destroy();
-          release();
-        };
-        upstream.on("error", (err) => {
-          log.error(`upstream WS error: ${err.message}`);
-          teardown();
-        });
-        socket.on("error", (err) => {
-          log.warn(`client WS error: ${err.message}`);
-          teardown();
-        });
-        upstream.on("close", teardown);
-        socket.on("close", teardown);
+        socket.once("close", () => streamlit.release());
+        streamlitProxy.ws(req, socket, head);
       })
       .catch((err) => {
         log.error(`Streamlit upgrade aborted: ${(err as Error).message}`);
@@ -153,6 +105,7 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<NestExp
   return app;
 }
 
-if (import.meta.main) {
+const isEntry = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isEntry) {
   void bootstrap();
 }

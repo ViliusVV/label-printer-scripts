@@ -22,7 +22,10 @@
       "Bash(DEBUG=\"http-proxy-middleware*\" bun run dev)",
       "Bash(NODE_TLS_REJECT_UNAUTHORIZED=0 bun run scripts/ws-probe.ts)",
       "Bash(bun --version)",
-      "Bash(node --experimental-strip-types scripts/adhoc/upgrade-echo.ts)"
+      "Bash(node --experimental-strip-types scripts/adhoc/upgrade-echo.ts)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(NODE_TLS_REJECT_UNAUTHORIZED=0 bun run scripts/adhoc/ws-probe.ts wss://localhost:5174/streamlit/_stcore/stream)"
     ]
   }
 }
