@@ -12,6 +12,7 @@ export default function RootLayout() {
           </span>
           <NavLink to="/">Input</NavLink>
           <NavLink to="/sqlite">Inputs|SQLite</NavLink>
+          <NavLink to="/dexie">Inputs|Dexie</NavLink>
           <NavLink to="/print">Print</NavLink>
           <div class="ml-auto">
             <ThemeToggle />

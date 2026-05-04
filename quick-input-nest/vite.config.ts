@@ -60,6 +60,12 @@ export default defineConfig(async () => ({
     outDir: "../../dist/client",
     emptyOutDir: true,
   },
+  optimizeDeps: {
+    exclude: ["@sqlite.org/sqlite-wasm"],
+  },
+  worker: {
+    format: "es" as const,
+  },
   server: {
     port: 5174,
     host: "0.0.0.0",
