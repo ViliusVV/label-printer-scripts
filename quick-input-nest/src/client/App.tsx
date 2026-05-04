@@ -41,6 +41,12 @@ export default function App() {
 
   const displayEntries = () => entriesQuery.data ?? [];
 
+  const isInvalid = () => {
+    const trimmed = text().trim();
+    if (!trimmed) return false;
+    return transformInput(trimmed) === null;
+  };
+
   let inputRef: HTMLInputElement | undefined;
 
   const submit = (e: SubmitEvent) => {
@@ -81,7 +87,11 @@ export default function App() {
           autocorrect="off"
           spellcheck={false}
           placeholder="Type and press Enter"
-          class="flex-1 rounded-lg border-2 border-gray-300 px-3 py-3 text-2xl outline-none focus:border-blue-600"
+          class="flex-1 rounded-lg border-2 px-3 py-3 text-2xl outline-none"
+          classList={{
+            "border-gray-300 focus:border-blue-600": !isInvalid(),
+            "border-red-500 focus:border-red-600": isInvalid(),
+          }}
         />
       </form>
 
